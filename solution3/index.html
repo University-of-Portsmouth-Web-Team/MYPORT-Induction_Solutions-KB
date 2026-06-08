@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Induction Timetable | University of Portsmouth</title>
+  <meta name="description" content="Find your course induction timetable. Search by course name, use quick filters, or ask questions about your induction.">
+  <meta name="theme-color" content="#002147">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#content" class="skip-link">Skip to main content</a>
+
+  <!-- App shell -->
+  <div class="app-shell" id="app">
+    <!-- Sidebar nav -->
+    <aside class="sidebar" aria-label="Navigation">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 36 36" width="36" height="36" aria-hidden="true">
+          <rect width="36" height="36" rx="6" fill="#C8951A"/>
+          <text x="7" y="26" font-family="serif" font-size="20" font-weight="bold" fill="#002147">U</text>
+        </svg>
+        <div>
+          <div class="sidebar-logo-title">MyPort</div>
+          <div class="sidebar-logo-sub">Inductions</div>
+        </div>
+      </div>
+
+      <nav aria-label="Main navigation">
+        <ul class="sidebar-nav">
+          <li><button type="button" class="sidebar-btn active" data-panel="search" aria-current="page">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>
+            Find my course
+          </button></li>
+          <li><button type="button" class="sidebar-btn" data-panel="recent">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke-linecap="round"/></svg>
+            Recent
+          </button></li>
+          <li><button type="button" class="sidebar-btn" data-panel="about">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg>
+            About inductions
+          </button></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="https://myport.port.ac.uk">← Back to MyPort</a>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-panel" id="content">
+      <!-- SEARCH PANEL -->
+      <div id="panel-search" class="panel active" role="region" aria-label="Search for your course">
+        <div class="panel-header">
+          <h1>Your Induction Timetable</h1>
+          <p class="panel-lead">Find and view your course induction schedule for January 2026.</p>
+        </div>
+
+        <div class="search-area" role="search" aria-label="Course search">
+          <label for="main-search" class="search-label">Search for your course</label>
+          <div class="search-input-group">
+            <svg class="search-icon-svg" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/>
+            </svg>
+            <input type="search" id="main-search" name="search"
+              placeholder="e.g. Architecture, Nursing, Computer Science…"
+              autocomplete="off"
+              aria-describedby="search-description live-count"
+              aria-controls="results-region"
+            >
+            <button type="button" id="btn-clear-search" aria-label="Clear search" hidden>✕</button>
+          </div>
+          <p id="search-description" class="input-hint">Start typing your course name. Use the filters below to narrow by type.</p>
+        </div>
+
+        <!-- Quick-filter chips -->
+        <div class="chip-group" role="group" aria-label="Filter by course type">
+          <button type="button" class="chip active" data-type="all" aria-pressed="true">All courses</button>
+          <button type="button" class="chip" data-type="UG" aria-pressed="false">Undergraduate</button>
+          <button type="button" class="chip" data-type="PGT" aria-pressed="false">Postgraduate</button>
+        </div>
+
+        <!-- Results -->
+        <div class="results-bar">
+          <span id="live-count" aria-live="polite" aria-atomic="true"></span>
+          <div class="alpha-pills" id="alpha-pills" role="navigation" aria-label="Jump to letter"></div>
+        </div>
+
+        <div id="results-region" role="region" aria-label="Course listing" aria-live="off">
+          <div id="courses-output"></div>
+        </div>
+      </div>
+
+      <!-- DETAIL PANEL -->
+      <div id="panel-detail" class="panel" hidden role="region" aria-label="Course induction details">
+        <div class="detail-top-bar">
+          <button type="button" id="btn-back-detail" class="back-button">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            All inductions
+          </button>
+        </div>
+        <div id="detail-content"></div>
+      </div>
+
+      <!-- RECENT PANEL -->
+      <div id="panel-recent" class="panel" hidden role="region" aria-label="Recently viewed courses">
+        <div class="panel-header">
+          <h1>Recently Viewed</h1>
+          <p class="panel-lead">Your recently viewed induction pages.</p>
+        </div>
+        <div id="recent-content">
+          <p class="muted-text">You haven't viewed any courses yet. Use <strong>Find my course</strong> to get started.</p>
+        </div>
+      </div>
+
+      <!-- ABOUT PANEL -->
+      <div id="panel-about" class="panel" hidden role="region" aria-label="About inductions">
+        <div class="panel-header">
+          <h1>About Inductions</h1>
+        </div>
+        <div class="prose">
+          <h2>What is induction?</h2>
+          <p>Induction is your first formal introduction to life at the University of Portsmouth. Sessions are designed to help you settle in, meet your course team and fellow students, and find out everything you need to know to hit the ground running.</p>
+          <h2>Do I have to attend?</h2>
+          <p>Yes — induction sessions are compulsory. If you are unable to attend any session, please contact your School or Department office as soon as possible.</p>
+          <h2>What should I bring?</h2>
+          <ul>
+            <li>Your student ID card (or proof of enrolment if not yet issued)</li>
+            <li>A notepad and pen, or laptop</li>
+            <li>Your University login credentials</li>
+          </ul>
+          <h2>International students</h2>
+          <p>In addition to your course induction, you may need to attend international student orientation sessions. Check your email and the <a href="https://myport.port.ac.uk/international">International Students pages</a> for details.</p>
+          <h2>Need help?</h2>
+          <p>Contact your School office or visit <a href="https://myport.port.ac.uk">MyPort</a> for student support services. For IT queries email <a href="mailto:itsupport@port.ac.uk">itsupport@port.ac.uk</a>.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

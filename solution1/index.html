@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Course Induction Timetables | University of Portsmouth</title>
+  <meta name="description" content="Find your course induction timetable at the University of Portsmouth. Search by course name to see your induction schedule.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" role="banner">
+    <div class="header-inner">
+      <div class="logo-area">
+        <svg class="logo-mark" aria-hidden="true" viewBox="0 0 40 40" width="40" height="40">
+          <rect width="40" height="40" rx="4" fill="#002147"/>
+          <text x="8" y="28" font-family="serif" font-size="22" font-weight="bold" fill="#fff">U</text>
+        </svg>
+        <div class="logo-text">
+          <span class="logo-title">University of Portsmouth</span>
+          <span class="logo-subtitle">MyPort</span>
+        </div>
+      </div>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li><a href="https://myport.port.ac.uk">MyPort</a></li>
+          <li><a href="https://myport.port.ac.uk/welcome">Welcome</a></li>
+          <li><a href="https://myport.port.ac.uk/welcome/welcome-events">Welcome Events</a></li>
+          <li aria-current="page">Course Inductions</li>
+        </ol>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- LISTING VIEW -->
+    <div id="view-listing" role="region" aria-label="Course induction search">
+      <div class="page-hero">
+        <div class="hero-inner">
+          <h1>Undergraduate Course Inductions</h1>
+          <p class="hero-lead">Find your course below and view your personalised induction timetable. Inductions help you get settled in, meet your fellow students and find out everything you need to know about your course.</p>
+        </div>
+      </div>
+
+      <div class="listing-container">
+        <div class="search-panel" role="search" aria-label="Search for your course">
+          <label for="course-search" class="search-label">Search for your course</label>
+          <div class="search-input-wrap">
+            <svg class="search-icon" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2" fill="none"/>
+              <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <input 
+              type="search" 
+              id="course-search" 
+              name="course-search"
+              placeholder="e.g. Architecture, Nursing, Computer Science…" 
+              autocomplete="off"
+              aria-describedby="search-hint search-status"
+            >
+            <button type="button" id="clear-search" class="clear-btn" aria-label="Clear search" hidden>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <p id="search-hint" class="search-hint">Enter your course name to filter results</p>
+          <div id="search-status" class="sr-only" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-group" role="group" aria-label="Filter by course type">
+            <span class="filter-label">Filter by:</span>
+            <button class="filter-btn active" data-filter="all" aria-pressed="true">All courses</button>
+            <button class="filter-btn" data-filter="UG" aria-pressed="false">Undergraduate</button>
+            <button class="filter-btn" data-filter="PGT" aria-pressed="false">Postgraduate</button>
+          </div>
+          <div class="results-count" id="results-count" aria-live="polite" aria-atomic="true"></div>
+        </div>
+
+        <div id="alpha-index" class="alpha-index" role="navigation" aria-label="Alphabetical index">
+          <!-- filled by JS -->
+        </div>
+
+        <div id="courses-listing" class="courses-listing" role="list">
+          <div class="loading-state" id="loading-state" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading courses…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAIL VIEW -->
+    <div id="view-detail" class="view-detail" hidden aria-label="Course induction details" role="region">
+      <div class="detail-header">
+        <div class="detail-header-inner">
+          <button type="button" id="back-btn" class="back-btn">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Back to all inductions
+          </button>
+          <div id="detail-breadcrumb" class="detail-breadcrumb" aria-label="Current location"></div>
+        </div>
+      </div>
+      <div class="detail-content">
+        <div class="detail-main">
+          <h1 id="detail-course-name" tabindex="-1"></h1>
+          <div id="detail-year-tabs" class="year-tabs" role="tablist" aria-label="Select year of study"></div>
+          <div id="detail-welcome" class="welcome-block"></div>
+          <div id="detail-accounts" class="accounts-block"></div>
+          <section id="timetable-section" aria-labelledby="timetable-heading">
+            <h2 id="timetable-heading">Your induction timetable</h2>
+            <div id="timetable-content"></div>
+          </section>
+          <section class="queries-block" aria-labelledby="queries-heading">
+            <h2 id="queries-heading">If you have any queries</h2>
+            <p>If you have any questions about your induction, please contact your School or Department office. You can also visit the <a href="https://myport.port.ac.uk">MyPort Student Portal</a> for further guidance.</p>
+            <p>For IT and online account queries, please contact <a href="mailto:itsupport@port.ac.uk">itsupport@port.ac.uk</a> or visit the <a href="https://myport.port.ac.uk/student-services/it-support">IT Support pages</a>.</p>
+          </section>
+          <section class="international-block" aria-labelledby="international-heading">
+            <h2 id="international-heading">International students</h2>
+            <p>If you are an international student, you may also need to attend additional orientation sessions. Please check your email and the <a href="https://myport.port.ac.uk/international">International Students pages</a> for further information about visa sign-in sessions, English language support and other important requirements.</p>
+          </section>
+          <section class="further-info-block" aria-labelledby="further-info-heading">
+            <h2 id="further-info-heading">Further information</h2>
+            <ul>
+              <li><a href="https://myport.port.ac.uk/campus-maps">Campus maps and building locations</a></li>
+              <li><a href="https://myport.port.ac.uk/student-services">Student services</a></li>
+              <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
+              <li><a href="https://myport.port.ac.uk/study/library">Library and study spaces</a></li>
+            </ul>
+          </section>
+        </div>
+        <div class="detail-sidebar">
+          <div class="sidebar-card" aria-labelledby="sidebar-need-help-heading">
+            <h3 id="sidebar-need-help-heading">Need help?</h3>
+            <ul class="sidebar-links">
+              <li><a href="https://myport.port.ac.uk/campus-maps">View campus maps</a></li>
+              <li><a href="https://myport.port.ac.uk/student-services/it-support">IT Support</a></li>
+              <li><a href="https://myport.port.ac.uk/student-services/student-wellbeing">Student Wellbeing</a></li>
+            </ul>
+          </div>
+          <div class="sidebar-card" id="sidebar-mod-info" aria-label="Module information">
+            <h3>Module information</h3>
+            <dl id="sidebar-dl"></dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <p>&copy; 2025 University of Portsmouth. All rights reserved.</p>
+      <nav aria-label="Footer navigation">
+        <ul>
+          <li><a href="https://www.port.ac.uk/footer-links/accessibility">Accessibility</a></li>
+          <li><a href="https://www.port.ac.uk/footer-links/privacy-policy">Privacy policy</a></li>
+          <li><a href="https://www.port.ac.uk/footer-links/cookies">Cookies</a></li>
+        </ul>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
