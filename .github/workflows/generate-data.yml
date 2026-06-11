@@ -1,128 +1,128 @@
-name: Generate Timetable Data
+name: Generate Data & Deploy to GitHub Pages
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Triggers
+# IMPORTANT: For the "Run workflow" button to appear in the Actions tab,
+# this file must exist on your repository's default branch (main/master).
+# Push this file first, then the button will be visible.
 # ─────────────────────────────────────────────────────────────────────────────
+
 on:
-  # 1. Manual trigger from the Actions tab — upload new xlsx files first,
-  #    commit them to data/, then run this workflow.
+  # Manual trigger — visible as "Run workflow" button in the Actions tab
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Dry run (build data.js but do NOT commit)"
+      deploy_pages:
+        description: "Deploy to GitHub Pages after generating data?"
         required: false
-        default: "false"
+        default: "true"
         type: choice
-        options: ["false", "true"]
+        options: ["true", "false"]
 
-  # 2. Automatic trigger whenever xlsx files are pushed to the data/ directory
+  # Automatic — fires whenever xlsx files are pushed to data/
   push:
+    branches: [main, master]
     paths:
       - "data/*.xlsx"
       - "data/*.xls"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Permissions — needed to commit the generated data.js files back to the repo
-# ─────────────────────────────────────────────────────────────────────────────
+# Allow writing back to the repo and deploying to Pages
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+# Only one deployment at a time
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1: Generate data.js from xlsx files
+  # ───────────────────────────────────────────────────────────────────────────
   generate:
-    name: Generate data.js from xlsx
+    name: Generate data.js
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Fetch with a token so the subsequent push step works
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 2. Python ────────────────────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+          cache: pip
 
-      # ── 3. Dependencies ──────────────────────────────────────────────────
       - name: Install dependencies
         run: pip install pandas openpyxl
 
-      # ── 4. Verify source files exist ─────────────────────────────────────
       - name: Check for xlsx files in data/
         run: |
-          echo "Files present in data/:"
-          ls -lh data/ || echo "  (data/ directory is empty or missing)"
-          
-          # Fail early with a clear message if no xlsx files found
+          echo "Files in data/:"
+          ls -lh data/ 2>/dev/null || echo "  (empty)"
           if ! ls data/*.xlsx data/*.xls 2>/dev/null | grep -q .; then
-            echo ""
-            echo "ERROR: No .xlsx or .xls files found in data/"
-            echo "Please commit your xlsx exports to the data/ directory and re-run."
-            exit 1
+            echo "::warning::No xlsx files found in data/ — data.js was not regenerated."
+            echo "SKIP_GENERATE=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_GENERATE=false" >> $GITHUB_ENV
           fi
 
-      # ── 5. Generate ──────────────────────────────────────────────────────
       - name: Generate data.js
+        if: env.SKIP_GENERATE == 'false'
         run: python scripts/generate_data.py
 
-      # ── 6. Verify output ─────────────────────────────────────────────────
-      - name: Verify generated files
-        run: |
-          for sol in solution1 solution2 solution3; do
-            if [ -f "$sol/data.js" ]; then
-              SIZE=$(wc -c < "$sol/data.js")
-              echo "✓ $sol/data.js  ($SIZE bytes)"
-            else
-              echo "✗ $sol/data.js  MISSING"
-              exit 1
-            fi
-          done
-
-      # ── 7. Commit & push (skipped on dry run) ────────────────────────────
       - name: Commit updated data.js files
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: env.SKIP_GENERATE == 'false'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add solution1/data.js solution2/data.js solution3/data.js
-
-          # Only commit if there are actual changes
           if git diff --cached --quiet; then
-            echo "No changes to data.js files — skipping commit."
+            echo "No changes to data.js — skipping commit."
           else
-            # Include the source filename(s) in the commit message
             SOURCES=$(ls data/*.xlsx data/*.xls 2>/dev/null | xargs -I{} basename {} | tr '\n' ', ' | sed 's/, $//')
-            git commit -m "chore: regenerate data.js from xlsx [${SOURCES}]
-
-Auto-generated by the Generate Timetable Data workflow.
-Source files: ${SOURCES}"
+            git commit -m "chore: regenerate data.js from [${SOURCES}]"
             git push
-            echo "✓ data.js files committed and pushed."
           fi
 
-      # ── 8. Summary ───────────────────────────────────────────────────────
-      - name: Job summary
-        if: always()
+      - name: Upload Pages artifact
+        if: >
+          github.event_name == 'push' ||
+          github.event.inputs.deploy_pages == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 2: Deploy to GitHub Pages
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: generate
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event.inputs.deploy_pages == 'true'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Print live URLs
         run: |
-          echo "## Timetable Data Generation Summary" >> $GITHUB_STEP_SUMMARY
+          BASE="${{ steps.deployment.outputs.page_url }}"
+          echo "## ✅ Deployed to GitHub Pages" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          for sol in solution1 solution2 solution3; do
-            if [ -f "$sol/data.js" ]; then
-              SIZE=$(wc -c < "$sol/data.js")
-              echo "- ✅ \`$sol/data.js\` — ${SIZE} bytes" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- ❌ \`$sol/data.js\` — not generated" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            echo "> ⚠️ Dry run — files were generated locally but **not committed**." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "> Files committed and pushed to \`${{ github.ref_name }}\`." >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "| Solution | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| Solution 1 — Standalone site | [${BASE}solution1/](${BASE}solution1/) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Solution 2 — Embeddable widget demo | [${BASE}solution2/demo-search-page.html](${BASE}solution2/demo-search-page.html) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Solution 3 — Progressive web app | [${BASE}solution3/](${BASE}solution3/) |" >> $GITHUB_STEP_SUMMARY

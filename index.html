@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Induction Timetable PoC | University of Portsmouth</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Encode+Sans+Expanded:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:      #0078B4;
+      --navy-dark: #004F76;
+      --heading:   #3C023C;
+      --gold:      #621360;
+      --teal:      #005681;
+      --bg:        #FAFAFA;
+      --surface:   #ffffff;
+      --border:    #D1D1D1;
+      --text:      #3C3C3C;
+      --textm:     #505457;
+      --focus:     #0078B4;
+    }
+
+    body {
+      font-family: 'Open Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      background: var(--navy);
+      color: #fff;
+      padding: 0 2rem;
+    }
+    .header-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.25rem 0;
+    }
+    .uop-wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: 'Encode Sans Expanded', Helvetica, sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #fff;
+      text-decoration: none;
+      line-height: 1.2;
+    }
+    .uop-wordmark .wordmark-text span { color: #BFE4FF; }
+    .header-divider {
+      width: 1px;
+      height: 1.5rem;
+      background: rgba(255,255,255,0.3);
+    }
+    .header-context {
+      font-size: 0.875rem;
+      color: #FFFFFF;
+    }
+
+    /* ── Main ── */
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 2rem 4rem;
+    }
+
+    .page-eyebrow {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 0.6rem;
+    }
+    h1 {
+      font-family: 'Encode Sans Expanded', Helvetica, sans-serif;
+      font-size: clamp(1.75rem, 4vw, 2.25rem);
+      font-weight: 600;
+      color: var(--heading);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+    .page-intro {
+      font-size: 1rem;
+      color: var(--textm);
+      line-height: 1.65;
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ── Cards ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 3rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+    .card:hover {
+      box-shadow: 0 4px 20px rgba(0,33,71,0.12);
+      transform: translateY(-2px);
+    }
+
+    .card-accent {
+      height: 5px;
+    }
+    .card-accent-1 { background: var(--navy); }
+    .card-accent-2 { background: var(--teal); }
+    .card-accent-3 { background: var(--gold); }
+
+    .card-body {
+      padding: 1.4rem 1.5rem 1rem;
+      flex: 1;
+    }
+    .card-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--textm);
+      margin-bottom: 0.35rem;
+    }
+    .card h2 {
+      font-family: 'Encode Sans Expanded', Helvetica, sans-serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 0.6rem;
+      line-height: 1.25;
+    }
+    .card p {
+      font-size: 0.875rem;
+      color: var(--textm);
+      line-height: 1.6;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      padding: 0.75rem 1.5rem;
+    }
+    .tag {
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.2rem 0.55rem;
+      border-radius: 0;
+      background: var(--bg);
+      color: var(--textm);
+      border: 1px solid var(--border);
+    }
+
+    .card-footer {
+      padding: 0.9rem 1.5rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1.1rem;
+      background: var(--navy);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 0;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--navy-dark); }
+    .btn-primary:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8125rem;
+      color: var(--navy);
+      text-decoration: underline;
+      text-decoration-color: transparent;
+      font-weight: 500;
+      transition: text-decoration-color 0.15s;
+    }
+    .btn-secondary:hover { text-decoration-color: currentColor; }
+    .btn-secondary:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+      border-radius: 0;
+    }
+
+    /* ── Info section ── */
+    .info-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 1.5rem 1.75rem;
+      max-width: 640px;
+    }
+    .info-section h2 {
+      font-family: 'Encode Sans Expanded', Helvetica, sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 0.75rem;
+    }
+    .info-section p {
+      font-size: 0.875rem;
+      color: var(--textm);
+      line-height: 1.65;
+      margin-bottom: 0.5rem;
+    }
+    .info-section code {
+      font-size: 0.8125rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 0.1rem 0.4rem;
+      border-radius: 0;
+    }
+
+    /* ── Footer ── */
+    .site-footer {
+      border-top: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      text-align: center;
+      font-size: 0.8125rem;
+      color: var(--textm);
+    }
+    .site-footer a {
+      color: var(--navy);
+      text-decoration: underline;
+    }
+
+    @media (max-width: 520px) {
+      main { padding: 2rem 1.25rem 3rem; }
+      .card-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<a class="sr-only" href="#main" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;focus:{position:static;width:auto;height:auto;}">Skip to main content</a>
+
+<header class="site-header" role="banner">
+  <div class="header-inner">
+    <a class="uop-wordmark" href="https://www.port.ac.uk" aria-label="University of Portsmouth">
+      <img src="favicon.png" alt="" width="36" height="36" style="display:block">
+      <span class="wordmark-text">University of <span>Portsmouth</span></span>
+    </a>
+    <div class="header-divider" aria-hidden="true"></div>
+    <span class="header-context">Digital Experience</span>
+  </div>
+</header>
+
+<main id="main">
+  <p class="page-eyebrow" aria-hidden="true">UX-571 · Proof of concept</p>
+  <h1>Induction Timetable</h1>
+  <p class="page-intro">Three proof-of-concept solutions for the University of Portsmouth induction timetable. Each approach has different integration characteristics — explore them below and open whichever you'd like to review.</p>
+
+  <div class="card-grid" role="list">
+
+    <!-- Solution 1 -->
+    <article class="card" role="listitem">
+      <div class="card-accent card-accent-1" aria-hidden="true"></div>
+      <div class="card-body">
+        <p class="card-label">Solution 1</p>
+        <h2>Standalone Static Site</h2>
+        <p>A fully self-contained site. Works as a microsite, on GitHub Pages, or embedded via iframe into MyPort.</p>
+      </div>
+      <div class="card-tags" aria-label="Solution tags">
+        <span class="tag">Static HTML</span>
+        <span class="tag">Standalone</span>
+        <span class="tag">iframe-ready</span>
+      </div>
+      <div class="card-footer">
+        <a class="btn-primary" href="solution1/index.html">Open solution 1 →</a>
+        <a class="btn-secondary" href="solution1/README.md">README</a>
+      </div>
+    </article>
+
+    <!-- Solution 2 -->
+    <article class="card" role="listitem">
+      <div class="card-accent card-accent-2" aria-hidden="true"></div>
+      <div class="card-body">
+        <p class="card-label">Solution 2</p>
+        <h2>Embeddable Widget</h2>
+        <p>A drop-in JavaScript widget that integrates directly into any existing MyPort page with no style bleed.</p>
+      </div>
+      <div class="card-tags" aria-label="Solution tags">
+        <span class="tag">JS Widget</span>
+        <span class="tag">MyPort-native</span>
+        <span class="tag">Zero bleed</span>
+      </div>
+      <div class="card-footer">
+        <a class="btn-primary" href="solution2/demo-search-page.html">Open solution 2 →</a>
+        <a class="btn-secondary" href="solution2/README.md">README</a>
+      </div>
+    </article>
+
+    <!-- Solution 3 -->
+    <article class="card" role="listitem">
+      <div class="card-accent card-accent-3" aria-hidden="true"></div>
+      <div class="card-body">
+        <p class="card-label">Solution 3</p>
+        <h2>Progressive Web App</h2>
+        <p>An app-shell layout with a persistent sidebar, recently-viewed history, and deep-linkable course URLs.</p>
+      </div>
+      <div class="card-tags" aria-label="Solution tags">
+        <span class="tag">App shell</span>
+        <span class="tag">Recently viewed</span>
+        <span class="tag">Deep links</span>
+      </div>
+      <div class="card-footer">
+        <a class="btn-primary" href="solution3/index.html">Open solution 3 →</a>
+        <a class="btn-secondary" href="solution3/README.md">README</a>
+      </div>
+    </article>
+
+  </div>
+
+  <div class="info-section">
+    <h2>Updating the timetable data</h2>
+    <p>When new Scientia/SITS exports are available, commit them to the <code>data/</code> folder and push to <code>main</code>. The <strong>Generate Data &amp; Deploy</strong> GitHub Action will run automatically, regenerate all three <code>data.js</code> files, and redeploy this page.</p>
+    <p>You can also trigger a manual run from the <strong>Actions</strong> tab → <em>Generate Data &amp; Deploy to GitHub Pages</em> → <strong>Run workflow</strong>.</p>
+  </div>
+</main>
+
+<footer class="site-footer" role="contentinfo">
+  University of Portsmouth · Digital Experience · <a href="https://digitaluop.atlassian.net/browse/UX-571">UX-571</a>
+</footer>
+
+</body>
+</html>

@@ -25,29 +25,30 @@
     .uop-ind *::before,
     .uop-ind *::after { box-sizing: border-box; }
     .uop-ind {
-      --ui-navy: #002147;
-      --ui-navy-d: #001230;
-      --ui-gold: #C8951A;
-      --ui-gold-l: #E8B84B;
-      --ui-teal: #007B7F;
+      --ui-navy: #0078B4;
+      --ui-navy-d: #004F76;
+      --ui-gold: #621360;
+      --ui-gold-l: #00A0FF;
+      --ui-teal: #005681;
       --ui-white: #ffffff;
-      --ui-bg: #F5F4F1;
-      --ui-bg-w: #EEE9E2;
+      --ui-bg: #FAFAFA;
+      --ui-bg-w: #F2FAFF;
       --ui-surf: #ffffff;
-      --ui-bdr: #C9C4BB;
-      --ui-bdr-s: #8C887F;
-      --ui-txt: #1A1814;
-      --ui-txt2: #4A4641;
-      --ui-txtm: #6B6460;
-      --ui-link: #002D5E;
-      --ui-link-h: #005EB8;
-      --ui-focus: #005EB8;
-      font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --ui-bdr: #D1D1D1;
+      --ui-bdr-s: #ABAAAA;
+      --ui-txt: #3C3C3C;
+      --ui-txt2: #505457;
+      --ui-txtm: #505457;
+      --ui-link: #0078B4;
+      --ui-link-h: #004F76;
+      --ui-focus: #0078B4;
+      --ui-head: #3C023C;
+      font-family: 'Open Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
       font-size: 16px;
       line-height: 1.6;
       color: var(--ui-txt);
       background: var(--ui-bg);
-      border-radius: 8px;
+      border-radius: 0;
       overflow: hidden;
     }
     .uop-ind a { color: var(--ui-link); text-decoration: underline; text-underline-offset: 2px; }
@@ -55,11 +56,11 @@
     .uop-ind *:focus-visible {
       outline: 3px solid var(--ui-focus);
       outline-offset: 2px;
-      border-radius: 3px;
+      border-radius: 0;
     }
     .uop-ind h1,
     .uop-ind h2,
-    .uop-ind h3 { font-weight: 700; line-height: 1.25; color: var(--ui-navy); margin: 0; }
+    .uop-ind h3 { font-weight: 700; line-height: 1.25; color: var(--ui-head); margin: 0; }
     .uop-ind [hidden] { display: none !important; }
     .uop-ind .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0;
@@ -83,19 +84,19 @@
     }
     .uop-ind__header-sub {
       font-size: 0.8125rem;
-      color: rgba(255,255,255,0.7);
+      color: var(--ui-white);
       margin-top: 2px;
     }
     .uop-ind__back-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(255,255,255,0.12);
-      border: 1.5px solid rgba(255,255,255,0.35);
-      border-radius: 6px;
+      background: var(--ui-navy-d);
+      border: 1.5px solid var(--ui-white);
+      border-radius: 0;
       color: white; font-size: 0.8125rem; font-weight: 500;
       padding: 6px 12px; cursor: pointer; white-space: nowrap;
       transition: background 0.2s;
     }
-    .uop-ind__back-btn:hover { background: rgba(255,255,255,0.22); }
+    .uop-ind__back-btn:hover { background: var(--ui-white); color: var(--ui-navy-d); }
 
     /* Search panel */
     .uop-ind__search-wrap { padding: 16px 20px; background: var(--ui-surf); border-bottom: 1px solid var(--ui-bdr); }
@@ -105,7 +106,7 @@
     .uop-ind__search-input {
       width: 100%; font-size: 0.9375rem; font-family: inherit;
       padding: 10px 36px; border: 2px solid var(--ui-bdr-s);
-      border-radius: 6px; background: var(--ui-bg); color: var(--ui-txt);
+      border-radius: 0; background: var(--ui-bg); color: var(--ui-txt);
       transition: border-color 0.15s, box-shadow 0.15s;
       -webkit-appearance: none; appearance: none;
     }
@@ -115,7 +116,7 @@
     .uop-ind__clear-btn {
       position: absolute; right: 8px; background: none; border: none;
       cursor: pointer; color: var(--ui-txtm); padding: 4px;
-      display: flex; align-items: center; border-radius: 4px;
+      display: flex; align-items: center; border-radius: 0;
     }
     .uop-ind__clear-btn:hover { color: var(--ui-txt); }
 
@@ -128,7 +129,7 @@
     .uop-ind__filter-label { font-size: 0.8125rem; font-weight: 600; color: var(--ui-txt2); }
     .uop-ind__filter-btn {
       background: var(--ui-surf); border: 1.5px solid var(--ui-bdr-s);
-      border-radius: 100px; padding: 4px 14px;
+      border-radius: 0; padding: 4px 14px;
       font-size: 0.8125rem; font-weight: 500; font-family: inherit;
       color: var(--ui-txt2); cursor: pointer; transition: all 0.15s;
     }
@@ -144,14 +145,21 @@
     .uop-ind__alpha-lnk {
       display: inline-flex; align-items: center; justify-content: center;
       width: 28px; height: 28px; font-size: 0.8125rem; font-weight: 600;
-      color: var(--ui-txt2); text-decoration: none; border-radius: 4px;
+      color: var(--ui-txt2); text-decoration: none; border-radius: 0;
       transition: all 0.15s;
     }
-    .uop-ind__alpha-lnk.has { color: var(--ui-navy); }
-    .uop-ind__alpha-lnk.has:hover { background: var(--ui-bg-w); }
-    .uop-ind__alpha-lnk.off { color: var(--ui-bdr); cursor: default; pointer-events: none; }
+    .uop-ind__alpha-lnk.has {
+      color: var(--ui-navy); background: var(--ui-white);
+      border: 1.5px solid var(--ui-navy); cursor: pointer;
+    }
+    .uop-ind__alpha-lnk.has:hover,
+    .uop-ind__alpha-lnk.has:focus-visible { background: var(--ui-navy); color: var(--ui-white); }
+    .uop-ind__alpha-lnk.off {
+      color: #949494; border: 1.5px solid transparent;
+      cursor: default; pointer-events: none;
+    }
     .uop-ind__letter-hd {
-      font-size: 1.125rem; font-weight: 700; color: var(--ui-navy);
+      font-size: 1.125rem; font-weight: 700; color: var(--ui-head);
       padding: 12px 20px 4px; border-bottom: 2px solid var(--ui-gold);
       display: inline-block; margin: 4px 20px 0;
     }
@@ -164,28 +172,28 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 20px 8px; gap: 12px;
     }
-    .uop-ind__course-nm { font-size: 0.9375rem; font-weight: 600; color: var(--ui-navy); }
+    .uop-ind__course-nm { font-size: 0.9375rem; font-weight: 600; color: var(--ui-head); }
     .uop-ind__badge {
       font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.05em;
-      text-transform: uppercase; padding: 2px 8px; border-radius: 100px; flex-shrink: 0;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 0; flex-shrink: 0;
     }
-    .uop-ind__badge-UG { background: #E8F0F8; color: #002D5E; border: 1px solid #B8CDE0; }
-    .uop-ind__badge-PGT { background: #F0EBF8; color: #3D1F6B; border: 1px solid #C9B8E0; }
-    .uop-ind__badge-Other { background: #F0F5F0; color: #1A4A1F; border: 1px solid #B8D4B8; }
+    .uop-ind__badge-UG { background: #F2FAFF; color: #005681; border: 1px solid #99CDE9; }
+    .uop-ind__badge-PGT { background: #F7EFF7; color: #621360; border: 1px solid #D4A8D3; }
+    .uop-ind__badge-Other { background: #F7F7F7; color: #3C3C3C; border: 1px solid #D1D1D1; }
     .uop-ind__year-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 12px; }
     .uop-ind__year-btn {
       display: inline-flex; align-items: center; gap: 5px;
       font-size: 0.8125rem; font-weight: 500; font-family: inherit;
       color: var(--ui-link); text-decoration: none;
       padding: 5px 12px; background: var(--ui-surf);
-      border: 1.5px solid var(--ui-bdr); border-radius: 100px;
+      border: 1.5px solid var(--ui-bdr); border-radius: 0;
       cursor: pointer; transition: all 0.15s;
     }
     .uop-ind__year-btn:hover { background: var(--ui-navy); border-color: var(--ui-navy); color: white; }
-    .uop-ind__year-btn:hover .uop-ind__ev-cnt { background: var(--ui-gold-l); }
+    .uop-ind__year-btn:hover .uop-ind__ev-cnt { background: #fff; color: var(--ui-head); }
     .uop-ind__ev-cnt {
-      background: var(--ui-gold); color: var(--ui-navy-d);
-      font-size: 0.6875rem; font-weight: 700; padding: 1px 6px; border-radius: 100px;
+      background: var(--ui-head); color: #fff;
+      font-size: 0.6875rem; font-weight: 700; padding: 1px 6px; border-radius: 0;
     }
 
     /* Detail view */
@@ -195,7 +203,7 @@
     .uop-ind__yr-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
     .uop-ind__yr-tab {
       background: var(--ui-surf); border: 1.5px solid var(--ui-bdr-s); border-bottom: none;
-      border-radius: 6px 6px 0 0; padding: 7px 18px;
+      border-radius: 0 6px 0 0; padding: 7px 18px;
       font-size: 0.875rem; font-weight: 500; font-family: inherit;
       color: var(--ui-txt2); cursor: pointer; transition: all 0.15s;
     }
@@ -228,22 +236,26 @@
     .uop-ind__ev-loc { font-size: 0.8125rem; color: var(--ui-txt2); }
     .uop-ind__online-badge {
       display: inline-flex; align-items: center; gap: 3px;
-      background: #E8F0F8; color: #005EB8;
-      border: 1px solid #B8CDE0; font-size: 0.6875rem; font-weight: 700;
-      padding: 2px 7px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.04em;
+      background: #F2FAFF; color: #005EB8;
+      border: 1px solid #99CDE9; font-size: 0.6875rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 0; text-transform: uppercase; letter-spacing: 0.04em;
     }
     .uop-ind__day-hd {
-      font-size: 0.9375rem; font-weight: 700; color: var(--ui-navy);
-      background: var(--ui-bg-w); padding: 8px 10px;
-      border-radius: 6px; margin: 12px 0 6px;
-      border-left: 4px solid var(--ui-navy);
+      font-size: 0.9375rem; font-weight: 700; color: var(--ui-white);
+      background: var(--ui-head); padding: 8px 10px;
+      border-radius: 0; margin: 12px 0 0;
     }
+    .uop-ind__join-link {
+      display: inline-block; color: var(--ui-link); font-weight: 600;
+      text-decoration: underline; text-underline-offset: 2px; margin-top: 4px;
+    }
+    .uop-ind__join-link:hover { color: var(--ui-link-h); }
     .uop-ind__no-events { text-align: center; padding: 32px 16px; color: var(--ui-txtm); font-size: 0.9375rem; }
     .uop-ind__info-block {
-      border: 1px solid var(--ui-bdr); border-radius: 6px;
+      border: 1px solid var(--ui-bdr); border-radius: 0;
       padding: 14px 16px; margin-bottom: 12px; font-size: 0.875rem;
     }
-    .uop-ind__info-block h3 { font-size: 0.9375rem; margin-bottom: 6px; color: var(--ui-navy); }
+    .uop-ind__info-block h3 { font-size: 0.9375rem; margin-bottom: 6px; color: var(--ui-head); }
     .uop-ind__info-block p, .uop-ind__info-block ul { color: var(--ui-txt2); }
     .uop-ind__info-block ul { padding-left: 18px; margin-top: 4px; }
     .uop-ind__info-block li + li { margin-top: 4px; }
@@ -252,7 +264,7 @@
     .uop-ind__spinner {
       width: 36px; height: 36px;
       border: 3px solid var(--ui-bdr); border-top-color: var(--ui-navy);
-      border-radius: 50%;
+      border-radius: 0;
       animation: uop-spin 0.8s linear infinite;
     }
     @keyframes uop-spin { to { transform: rotate(360deg); } }
@@ -262,7 +274,17 @@
   `;
 
   // ── Inject CSS once ────────────────────────────────────────
+  function injectFonts() {
+    if (document.getElementById('uop-ind-fonts')) return;
+    var l = document.createElement('link');
+    l.id = 'uop-ind-fonts';
+    l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Encode+Sans+Expanded:wght@500;700&display=swap';
+    document.head.appendChild(l);
+  }
+
   function injectStyles() {
+    injectFonts();
     if (document.getElementById('uop-induction-styles')) return;
     const style = document.createElement('style');
     style.id = 'uop-induction-styles';
@@ -535,7 +557,7 @@
               <td class="uop-ind__ev-time">${this.escHtml(ev.time)}</td>
               <td>
                 <div class="uop-ind__ev-title">${this.escHtml(ev.title)}</div>
-                ${ev.description ? `<div class="uop-ind__ev-desc">${this.escHtml(ev.description)}</div>` : ''}
+                ${ev.description ? `<div class="uop-ind__ev-desc">${this.linkifyDescription(ev.description)}</div>` : ''}
 
               </td>
               <td class="uop-ind__ev-loc">${this.buildLoc(ev)}</td>
@@ -551,7 +573,7 @@
         <div class="uop-ind__yr-tabs" role="tablist">${tabs}</div>
         <div class="uop-ind__welcome">${texts.welcome}</div>
         <div class="uop-ind__accounts">${texts.accounts}</div>
-        <h3 style="font-size:1rem;margin:16px 0 8px;color:var(--ui-navy)">Your induction timetable — ${this.escHtml(yl)}</h3>
+        <h3 style="font-size:1rem;margin:16px 0 8px;color:var(--ui-head)">Your induction timetable — ${this.escHtml(yl)}</h3>
         ${ttHtml}
         <div class="uop-ind__info-block">
           <h3>If you have any queries</h3>
@@ -604,6 +626,13 @@
           accounts: '<strong>Online accounts:</strong> Set up your University account to access Moodle, email and library resources before induction begins.'
         };
       }
+    }
+
+    linkifyDescription(text) {
+      const escaped = this.escHtml(text);
+      return escaped.replace(/\[(https?:\/\/[^\]\s]+)\]/g, (m, url) =>
+        `<a href="${url}" target="_blank" rel="noopener noreferrer" class="uop-ind__join-link" aria-label="Join online session (opens in new tab)">Join online session<span aria-hidden="true"> \u2197</span></a>`
+      );
     }
 
     escHtml(str) {

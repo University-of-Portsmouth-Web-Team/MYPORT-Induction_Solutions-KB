@@ -374,7 +374,7 @@
           <td class="event-time">${escHtml(ev.time)}</td>
           <td>
             <div class="event-title">${escHtml(ev.title)}</div>
-            ${ev.description ? `<div class="event-description">${escHtml(ev.description)}</div>` : ''}
+            ${ev.description ? `<div class="event-description">${linkifyDescription(ev.description)}</div>` : ''}
 
           </td>
           <td class="event-location">${locationHtml}</td>
@@ -443,6 +443,15 @@
   }
 
   // ── Utilities ──────────────────────────────────────────────
+
+  // Convert [https://...] in event descriptions into accessible hyperlinks
+  function linkifyDescription(text) {
+    const escaped = escHtml(text);
+    return escaped.replace(/\[(https?:\/\/[^\]\s]+)\]/g, (m, url) =>
+      `<a href="${url}" target="_blank" rel="noopener noreferrer" class="event-join-link" aria-label="Join online session (opens in new tab)">Join online session<span aria-hidden="true"> \u2197</span></a>`
+    );
+  }
+
   function escHtml(str) {
     if (!str) return '';
     return String(str)

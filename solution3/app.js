@@ -255,7 +255,7 @@
             <td class="ev-time">${esc(ev.time)}</td>
             <td>
               <div class="ev-title">${esc(ev.title)}</div>
-              ${ev.description ? `<div class="ev-desc">${esc(ev.description)}</div>` : ''}
+              ${ev.description ? `<div class="ev-desc">${linkifyDesc(ev.description)}</div>` : ''}
 
             </td>
             <td class="ev-loc">${locHtml(ev)}</td>
@@ -379,6 +379,15 @@
   }
 
   // ── Utilities ─────────────────────────────────────────────
+
+  // Convert [https://...] in event descriptions into accessible hyperlinks
+  function linkifyDesc(text) {
+    const escaped = esc(text);
+    return escaped.replace(/\[(https?:\/\/[^\]\s]+)\]/g, (m, url) =>
+      `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ev-join-link" aria-label="Join online session (opens in new tab)">Join online session<span aria-hidden="true"> \u2197</span></a>`
+    );
+  }
+
   function esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
