@@ -1,0 +1,9 @@
+# Dependencies for scripts/generate_data.py
+#
+# This file also serves as the cache key for actions/setup-python's
+# `cache: pip` option in .github/workflows/generate-data.yml.
+# If you remove it, remove that `cache: pip` line too, or the
+# workflow will fail before it runs.
+
+pandas>=2.0
+openpyxl>=3.1
