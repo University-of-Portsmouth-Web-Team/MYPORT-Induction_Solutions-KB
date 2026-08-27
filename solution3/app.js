@@ -281,12 +281,12 @@
       </div>
       <div class="info-section">
         <h2>International students</h2>
-        <p>Check your email and the <a href="https://myport.port.ac.uk/international">International Students pages</a> for additional orientation sessions, visa sign-in and English language support details.</p>
+        <p>Check your email and the <a href="https://myport.port.ac.uk/student-services/international-student-advice">International Students pages</a> for additional orientation sessions, visa sign-in and English language support details.</p>
       </div>
       <div class="info-section">
         <h2>Further information</h2>
         <ul>
-          <li><a href="https://myport.port.ac.uk/campus-maps">Campus maps and building locations</a></li>
+          <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions">Campus maps and building locations</a></li>
           <li><a href="https://myport.port.ac.uk/student-services">Student services</a></li>
           <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
         </ul>
@@ -321,7 +321,7 @@
     if (type === 'UG' && year === 1) {
       return {
         welcome: `<h2>Welcome to the University of Portsmouth!</h2><p>Your induction is your first introduction to life at Portsmouth. Sessions will help you settle in, meet your course team and fellow students, and get you ready to begin your studies. Attendance is compulsory — please attend all sessions listed below.</p>`,
-        accounts: `<h2>Accessing your online accounts</h2><p>Before you arrive, set up your University of Portsmouth account. You'll need this to access Moodle (our virtual learning environment), your University email, and the library. If you need help, visit <a href="https://myport.port.ac.uk/student-services/it-support">IT Support</a> or attend an IT drop-in session during induction week.</p>`
+        accounts: `<h2>Accessing your online accounts</h2><p>Before you arrive, set up your University of Portsmouth account. You'll need this to access Moodle (our virtual learning environment), your University email, and the library. If you need help, visit <a href="https://myport.port.ac.uk/it-support/student-it-support">IT Support</a> or attend an IT drop-in session during induction week.</p>`
       };
     } else if (type === 'UG') {
       return {

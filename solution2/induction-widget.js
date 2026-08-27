@@ -581,12 +581,12 @@
         </div>
         <div class="uop-ind__info-block">
           <h3>International students</h3>
-          <p>Please check your email and the <a href="https://myport.port.ac.uk/international">International Students pages</a> for additional orientation sessions, visa sign-in information and English language support.</p>
+          <p>Please check your email and the <a href="https://myport.port.ac.uk/student-services/international-student-advice">International Students pages</a> for additional orientation sessions, visa sign-in information and English language support.</p>
         </div>
         <div class="uop-ind__info-block">
           <h3>Further information</h3>
           <ul>
-            <li><a href="https://myport.port.ac.uk/campus-maps">Campus maps</a></li>
+            <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions">Campus maps</a></li>
             <li><a href="https://myport.port.ac.uk/student-services">Student services</a></li>
             <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
           </ul>

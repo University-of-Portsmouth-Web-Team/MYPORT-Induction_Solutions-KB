@@ -181,6 +181,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.8 | 2026-08-27 | **Solution 1** stripped of site header, breadcrumb, page hero and footer — page now opens on the search bar; visually hidden `<h1>` retained for accessibility. **All solutions:** four broken MyPort links corrected (IT Support, International, Campus maps, Library) |
 | v1.7 | 2026-06-11 | Bracketed online-session URLs in event descriptions converted to accessible "Join online session" hyperlinks (new tab, noopener) |
 | v1.6 | 2026-06-11 | Course names purple everywhere; A–Z index buttons clearly clickable; zero radius across all components; purple date separator bands; official UoP logo/favicon |
 | v1.5 | 2026-06-11 | WCAG 2.2 AA audit: fixed invisible event-count badges, headings now dark purple `#3C023C` (not link-blue), all translucent text on blue made solid white, sidebar states darken not lighten |
@@ -189,6 +190,21 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 | v1.2 | 2026-06-08 | Courses with no timetable events hidden from search |
 | v1.1 | 2026-06-08 | A–Z index by subject title; removed per-event IDs; footnotes; S1 sidebar cleaned up |
 | v1.0 | 2026-06-03 | Initial three-solution proof of concept |
+
+---
+
+## Link corrections (v1.8)
+
+The following MyPort URLs were out of date across the solutions and have been corrected repo-wide:
+
+| Old (broken) | New |
+|--------------|-----|
+| `/student-services/it-support` | `/it-support/student-it-support` |
+| `/international` | `/student-services/international-student-advice` |
+| `/campus-maps` | `/welcome/maps-and-directions` |
+| `/study/library` | `/student-services/student-life/supporting-your-studies/library` |
+
+All paths are relative to `https://myport.port.ac.uk`. 11 occurrences were replaced in total: 6 in Solution 1, 2 in Solution 2, 3 in Solution 3.
 
 ---
 

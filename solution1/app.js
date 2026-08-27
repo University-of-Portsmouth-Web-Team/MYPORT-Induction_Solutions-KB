@@ -43,7 +43,7 @@
         welcome: `<h2>Welcome to the University of Portsmouth!</h2>
           <p>We're delighted to welcome you as a new student. Your induction week is your opportunity to get settled in, meet your fellow students, and find out everything you need to know about your course and the University. Please make sure you attend all sessions listed below — they are designed to set you up for success in your studies.</p>`,
         accounts: `<h2>Accessing your online accounts</h2>
-          <p>Before your induction, please make sure you have set up your University of Portsmouth account. You'll need this to access all online systems, including Moodle (our virtual learning environment), your University email, and the library. If you need help, visit <a href="https://myport.port.ac.uk/student-services/it-support">IT Support</a> or attend one of the drop-in sessions during induction week.</p>`
+          <p>Before your induction, please make sure you have set up your University of Portsmouth account. You'll need this to access all online systems, including Moodle (our virtual learning environment), your University email, and the library. If you need help, visit <a href="https://myport.port.ac.uk/it-support/student-it-support">IT Support</a> or attend one of the drop-in sessions during induction week.</p>`
       };
     } else if (courseType === 'UG' && year > 1) {
       return {

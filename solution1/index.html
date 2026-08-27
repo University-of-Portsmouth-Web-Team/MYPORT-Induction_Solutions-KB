@@ -12,39 +12,14 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a href="#main-content" class="skip-link">Skip to main content</a>
-
-  <header class="site-header" role="banner">
-    <div class="header-inner">
-      <div class="logo-area">
-        <img class="logo-mark" src="favicon.png" alt="" width="40" height="40" aria-hidden="true">
-        <div class="logo-text">
-          <span class="logo-title">University of Portsmouth</span>
-          <span class="logo-subtitle">MyPort</span>
-        </div>
-      </div>
-      <nav class="breadcrumb" aria-label="Breadcrumb">
-        <ol>
-          <li><a href="https://myport.port.ac.uk">MyPort</a></li>
-          <li><a href="https://myport.port.ac.uk/welcome">Welcome</a></li>
-          <li><a href="https://myport.port.ac.uk/welcome/welcome-events">Welcome Events</a></li>
-          <li aria-current="page">Course Inductions</li>
-        </ol>
-      </nav>
-    </div>
-  </header>
-
   <main id="main-content">
     <!-- LISTING VIEW -->
     <div id="view-listing" role="region" aria-label="Course induction search">
-      <div class="page-hero">
-        <div class="hero-inner">
-          <h1>Undergraduate Course Inductions</h1>
-          <p class="hero-lead">Find your course below and view your personalised induction timetable. Inductions help you get settled in, meet your fellow students and find out everything you need to know about your course.</p>
-        </div>
-      </div>
-
       <div class="listing-container">
+        <!-- Visually hidden: the host page supplies the visible heading. Retained so the
+             document still has a level-1 heading for screen readers and validators. -->
+        <h1 class="sr-only">Course Inductions</h1>
+
         <div class="search-panel" role="search" aria-label="Search for your course">
           <label for="course-search" class="search-label">Search for your course</label>
           <div class="search-input-wrap">
@@ -119,19 +94,19 @@
           <section class="queries-block" aria-labelledby="queries-heading">
             <h2 id="queries-heading">If you have any queries</h2>
             <p>If you have any questions about your induction, please contact your School or Department office. You can also visit the <a href="https://myport.port.ac.uk">MyPort Student Portal</a> for further guidance.</p>
-            <p>For IT and online account queries, please contact <a href="mailto:itsupport@port.ac.uk">itsupport@port.ac.uk</a> or visit the <a href="https://myport.port.ac.uk/student-services/it-support">IT Support pages</a>.</p>
+            <p>For IT and online account queries, please contact <a href="mailto:itsupport@port.ac.uk">itsupport@port.ac.uk</a> or visit the <a href="https://myport.port.ac.uk/it-support/student-it-support">IT Support pages</a>.</p>
           </section>
           <section class="international-block" aria-labelledby="international-heading">
             <h2 id="international-heading">International students</h2>
-            <p>If you are an international student, you may also need to attend additional orientation sessions. Please check your email and the <a href="https://myport.port.ac.uk/international">International Students pages</a> for further information about visa sign-in sessions, English language support and other important requirements.</p>
+            <p>If you are an international student, you may also need to attend additional orientation sessions. Please check your email and the <a href="https://myport.port.ac.uk/student-services/international-student-advice">International Students pages</a> for further information about visa sign-in sessions, English language support and other important requirements.</p>
           </section>
           <section class="further-info-block" aria-labelledby="further-info-heading">
             <h2 id="further-info-heading">Further information</h2>
             <ul>
-              <li><a href="https://myport.port.ac.uk/campus-maps">Campus maps and building locations</a></li>
+              <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions">Campus maps and building locations</a></li>
               <li><a href="https://myport.port.ac.uk/student-services">Student services</a></li>
               <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
-              <li><a href="https://myport.port.ac.uk/study/library">Library and study spaces</a></li>
+              <li><a href="https://myport.port.ac.uk/student-services/student-life/supporting-your-studies/library">Library and study spaces</a></li>
             </ul>
           </section>
         </div>
@@ -139,8 +114,8 @@
           <div class="sidebar-card" aria-labelledby="sidebar-need-help-heading">
             <h3 id="sidebar-need-help-heading">Need help?</h3>
             <ul class="sidebar-links">
-              <li><a href="https://myport.port.ac.uk/campus-maps">View campus maps</a></li>
-              <li><a href="https://myport.port.ac.uk/student-services/it-support">IT Support</a></li>
+              <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions">View campus maps</a></li>
+              <li><a href="https://myport.port.ac.uk/it-support/student-it-support">IT Support</a></li>
               <li><a href="https://myport.port.ac.uk/student-services/student-wellbeing">Student Wellbeing</a></li>
             </ul>
           </div>
@@ -152,19 +127,6 @@
       </div>
     </div>
   </main>
-
-  <footer class="site-footer" role="contentinfo">
-    <div class="footer-inner">
-      <p>&copy; 2025 University of Portsmouth. All rights reserved.</p>
-      <nav aria-label="Footer navigation">
-        <ul>
-          <li><a href="https://www.port.ac.uk/footer-links/accessibility">Accessibility</a></li>
-          <li><a href="https://www.port.ac.uk/footer-links/privacy-policy">Privacy policy</a></li>
-          <li><a href="https://www.port.ac.uk/footer-links/cookies">Cookies</a></li>
-        </ul>
-      </nav>
-    </div>
-  </footer>
 
   <script src="data.js"></script>
   <script src="app.js"></script>
