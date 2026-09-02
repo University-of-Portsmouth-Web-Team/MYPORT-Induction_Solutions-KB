@@ -20,12 +20,39 @@ Output:
   solution2/data.js
   solution3/data.js
   (all three are identical — one shared data format used by all solutions)
+
+── Known data-quality workarounds (see README changelog v1.9) ────────────────
+1. Duplicate event rows
+   The events export repeats the same Event Id many times over — once per
+   course descriptor attached to the induction module.  Rows are de-duplicated
+   on (Module, Event Id); the timetable-bearing columns are identical within
+   each group, so nothing is lost.
+
+2. Transposed Site / Room columns
+   The export puts the ROOM NUMBER in the "Site" column and the BUILDING NAME
+   in the "Room" column.  These are swapped back on read.
+
+3. Parallel (unpaired) room lists
+   Multi-room bookings arrive as two comma-separated lists of equal length —
+   e.g. Site "2.01, 2.02, 2.03" / Room "St. Andrew's Court, St. Andrew's
+   Court, St. Andrew's Court".  Previously only the first Site was kept and
+   the Room string was printed whole, so rooms disappeared and the building
+   was repeated.  The two lists are now zipped index-for-index into
+   room/building pairs and emitted as `locations[]`.
+
+4. URLs buried in Details
+   Meeting links appear inline, sometimes wrapped in [square brackets], and
+   occasionally at the very start of the field (which used to swallow the
+   session title).  URLs are now stripped out of the text — delimiters and
+   dangling "Meeting link:" labels included — and emitted as `links[]` for
+   the renderers to show on their own line.
 """
 
 import argparse
 import glob
 import json
 import os
+import re
 import sys
 
 try:
@@ -86,6 +113,172 @@ def format_date_sort(d) -> str:
     return pd.Timestamp(d).strftime("%Y-%m-%d")
 
 
+# ── URL extraction from the Details field ─────────────────────────────────────
+
+# Matches a URL together with any opening delimiter that precedes it.  The URL
+# itself is grabbed greedily (\S+) so that closing delimiters and trailing
+# punctuation come along for the ride, then get trimmed off below.
+_URL_RE = re.compile(r"[\[\(<\u201c\"']?\s*(?:https?://|www\.)\S+", re.IGNORECASE)
+
+# Characters trimmed from the right-hand end of a captured URL.  Note that a
+# trailing digit or letter is never trimmed, so query strings ending in
+# "...9b.1" or "...QT09" survive intact.
+_URL_TRAILING = "]),.;:!?>\u201d\"'}"
+
+# Opening delimiters trimmed from the left-hand end.
+_URL_LEADING = "[(<\u201c\"'"
+
+_SENTINEL = "\x00"
+
+
+def _clean_url(raw: str) -> str:
+    """Strip surrounding delimiters and trailing punctuation from a raw match."""
+    u = raw.strip().lstrip(_URL_LEADING).strip()
+    u = u.rstrip(_URL_TRAILING)
+    if u.lower().startswith("www."):
+        u = "https://" + u
+    return u
+
+
+def is_usable_url(url: str) -> bool:
+    """Reject URLs the export has clearly truncated, so they stay as plain text.
+
+    A broken "Join the Teams meeting" button is worse for a student than the
+    raw text, so anything that cannot possibly resolve is left in the
+    description for the School to notice and fix at source.
+    """
+    m = re.match(r"^https?://([^/?#]+)", url, flags=re.IGNORECASE)
+    if not m:
+        return False
+    host = m.group(1).split(":")[0]
+    # Needs a real dotted hostname with a plausible TLD
+    if not re.match(r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", host):
+        return False
+    # Teams "meetup-join" deep links carry a thread id; without it the link
+    # has been cut off by the export's field-length limit.
+    if "/l/meetup-join/" in url.lower() and "%40thread" not in url.lower():
+        return False
+    return True
+
+
+def _tidy_fragment(text: str) -> str:
+    """Tidy a text fragment left behind after a URL was lifted out of it."""
+    t = re.sub(r"^[\s,]+|[\s,]+$", "", text)
+    # Drop a dangling connector label such as "Meeting link:" or
+    # "Microsoft Teams Link:" that no longer introduces anything.
+    guard = 0
+    while t.endswith(":") and guard < 3:
+        guard += 1
+        head, _, tail = t.rpartition(",")
+        if head and len(tail.strip()) <= 40:
+            t = re.sub(r"[\s,]+$", "", head)
+        else:
+            t = re.sub(r"[\s,]+$", "", t[:-1])
+            break
+    return t
+
+
+def extract_links(details: str) -> tuple[str, list[str]]:
+    """Split *details* into (text without URLs, ordered list of unique URLs)."""
+    if not details:
+        return "", []
+
+    found: list[str] = []
+
+    def _swap(match: "re.Match[str]") -> str:
+        url = _clean_url(match.group(0))
+        if not url or not is_usable_url(url):   # truncated / unusable — leave it be
+            return match.group(0)
+        found.append(url)
+        return _SENTINEL
+
+    stripped = _URL_RE.sub(_swap, details)
+
+    fragments = [_tidy_fragment(part) for part in stripped.split(_SENTINEL)]
+    text = ", ".join(f for f in fragments if f)
+
+    # De-duplicate while preserving order (some rows list the same link twice)
+    urls = list(dict.fromkeys(found))
+    return text, urls
+
+
+def link_label(url: str) -> str:
+    """Human-readable, self-describing link text for a meeting/resource URL."""
+    host = re.sub(r"^https?://", "", url, flags=re.IGNORECASE).split("/")[0].lower()
+    host = host.split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    if "teams.microsoft" in host or "teams.live" in host:
+        return "Join the Teams meeting"
+    if "zoom.us" in host or host.endswith("zoom.com"):
+        return "Join the Zoom meeting"
+    if "meet.google" in host or "webex" in host or "gotomeeting" in host:
+        return "Join the online meeting"
+    if "panopto" in host:
+        return "Watch on Panopto"
+    if "moodle" in host:
+        return "Open in Moodle"
+    return f"Open {host}"
+
+
+# ── Site / Room pairing ───────────────────────────────────────────────────────
+
+def _split_list(value) -> list[str]:
+    if pd.isna(value):
+        return []
+    s = str(value).strip()
+    if s == "" or s.lower() in ("nan", "nat", "none"):
+        return []
+    return [p.strip() for p in s.split(",") if p.strip() != ""]
+
+
+def build_locations(site_value, room_value) -> list[dict]:
+    """Zip the parallel Site/Room lists into ordered room/building pairs.
+
+    The export transposes the two columns: "Site" carries the room number and
+    "Room" carries the building name.  Both arrive as comma-separated lists of
+    equal length for multi-room bookings, one entry per booked room.
+    """
+    rooms     = _split_list(site_value)   # room numbers   (mislabelled "Site")
+    buildings = _split_list(room_value)   # building names (mislabelled "Room")
+
+    if not rooms and not buildings:
+        return []
+
+    # Normalise the two lists to the same length.  Equal lengths is the norm;
+    # a single value on one side is broadcast across the other; anything else
+    # is padded so no value is silently dropped.
+    if len(rooms) != len(buildings):
+        if len(rooms) == 1 and buildings:
+            rooms = rooms * len(buildings)
+        elif len(buildings) == 1 and rooms:
+            buildings = buildings * len(rooms)
+        else:
+            size = max(len(rooms), len(buildings))
+            rooms     = rooms     + [""] * (size - len(rooms))
+            buildings = buildings + [""] * (size - len(buildings))
+
+    pairs: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for room, building in zip(rooms, buildings):
+        key = (room, building)
+        if key in seen:               # suppress an identical repeated pair
+            continue
+        seen.add(key)
+        pairs.append({"room": room, "building": building})
+    return pairs
+
+
+def locations_are_online(locations: list[dict]) -> bool:
+    if not locations:
+        return False
+    return all(
+        loc["building"].strip().lower().startswith("online")
+        or loc["room"].strip().lower().startswith("online")
+        for loc in locations
+    )
+
+
 # ── Core data builder ─────────────────────────────────────────────────────────
 
 def build_courses(modules_path: str, events_path: str) -> list[dict]:
@@ -119,15 +312,37 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
 
     df_modules["course_type"] = df_modules["Crs Code"].apply(get_course_type)
 
+    # ── Workaround 1: suppress duplicate event rows ───────────────────────────
+    # The export emits one row per (induction module × course descriptor), so
+    # the same Event Id repeats several times for a module.  The columns that
+    # drive the timetable are identical within each group, so keeping the first
+    # row of each (Module, Event Id) pair is lossless.
+    rows_before = len(df_events)
+    df_events = df_events.drop_duplicates(subset=["Module", "Event Id"], keep="first")
+    rows_dropped = rows_before - len(df_events)
+    print(f"  Duplicate rows suppressed: {rows_dropped} "
+          f"({rows_before} → {len(df_events)} unique Module + Event Id)")
+
     # Build an event lookup keyed by module code for speed
     events_by_mod: dict[str, list] = {}
+    multi_room_events = 0
+    linked_events     = 0
+
     for _, ev in df_events.iterrows():
         mod_code = str(ev["Module"]).strip()
         if mod_code not in events_by_mod:
             events_by_mod[mod_code] = []
 
-        details    = str(ev["Details"]) if not pd.isna(ev["Details"]) else ""
-        comma_pos  = details.find(",")
+        raw_details = str(ev["Details"]) if not pd.isna(ev["Details"]) else ""
+
+        # ── Workaround 4: lift URLs out of Details before the title split ─────
+        # Doing this first also rescues rows where the URL sits in front of the
+        # session name and would otherwise have been read as the title.
+        details, urls = extract_links(raw_details)
+        if urls:
+            linked_events += 1
+
+        comma_pos = details.find(",")
         if comma_pos > 0:
             title       = details[:comma_pos].strip()
             description = details[comma_pos + 1:].strip()
@@ -135,17 +350,23 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
             title       = details.strip()
             description = ""
 
-        site = str(ev["Site"]) if not pd.isna(ev["Site"]) else ""
-        room = str(ev["Room"]) if not pd.isna(ev["Room"]) else ""
+        # The export contains a lot of doubled commas ("…leader,, Session 1"),
+        # which used to leave a stray comma at the front of the description.
+        title       = re.sub(r"^[\s,]+|[\s,]+$", "", title)
+        description = re.sub(r"^[\s,]+|[\s,]+$", "", description)
 
-        # De-duplicate repeated site values (some rows have "Park Building, Park Building, …")
-        if "," in site:
-            site = site.split(",")[0].strip()
+        # ── Workarounds 2 + 3: un-transpose and pair up the location lists ────
+        locations = build_locations(ev["Site"], ev["Room"])
+        if len(locations) > 1:
+            multi_room_events += 1
 
-        is_online = (
-            room.lower() in ("online", "online13")
-            or site.lower() == "online"
-        )
+        is_online = locations_are_online(locations)
+
+        # Legacy flat fields, kept so that any renderer that has not been
+        # updated still shows something sensible.  Now correctly oriented:
+        # `room` = room number(s), `site` = building name(s).
+        legacy_rooms     = list(dict.fromkeys(l["room"]     for l in locations if l["room"]))
+        legacy_buildings = list(dict.fromkeys(l["building"] for l in locations if l["building"]))
 
         events_by_mod[mod_code].append({
             "event_id":   int(ev["Event Id"]),
@@ -156,8 +377,10 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
             "finish":     format_time(ev["Finish"]),
             "title":      title,
             "description": description,
-            "site":       site,
-            "room":       room,
+            "locations":  locations,
+            "links":      [{"url": u, "label": link_label(u)} for u in urls],
+            "site":       ", ".join(legacy_buildings),
+            "room":       ", ".join(legacy_rooms),
             "is_online":  is_online,
             "mod_code":   mod_code,
         })
@@ -203,6 +426,8 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
     print(f"  Courses with events:   {with_events}  (shown in search)")
     print(f"  Courses without events:{without_events}  (hidden from search by the UI)")
     print(f"  Total events:          {total_events}")
+    print(f"  Multi-room events:     {multi_room_events}  (room/building pairs listed one per line)")
+    print(f"  Events with a link:    {linked_events}  (URL lifted out of Details)")
 
     return courses_list
 

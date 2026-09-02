@@ -752,13 +752,27 @@ h3 { font-size: 1.125rem; }
 
 .meta-note { font-size: 0.75rem; color: var(--textm); margin-top: 8px; }
 
-/* Online session join link (converted from [url] in event descriptions) */
-.event-join-link {
+/* Multi-room bookings: one room + building pair per line */
+.location-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: inline-block;
+  vertical-align: top;
+}
+.location-list li { display: block; }
+.location-list li + li { margin-top: 2px; }
+
+/* Meeting links lifted out of the event details — each on its own line */
+.event-links { margin-top: 6px; }
+
+.event-join-link {
+  display: block;
   color: var(--color-link);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
   margin-top: 4px;
+  overflow-wrap: anywhere;
 }
 .event-join-link:hover { color: var(--color-link-hover); }

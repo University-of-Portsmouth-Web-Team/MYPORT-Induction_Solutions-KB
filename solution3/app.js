@@ -237,7 +237,8 @@
       ttHtml = `<div class="no-events-block" role="status"><p>No events scheduled yet. Please check back or contact your School office.</p></div>`;
     } else {
       const byDate = {};
-      for (const ev of yd.events) {
+      // Duplicate rows suppressed by Induction Module ID + Event ID
+      for (const ev of dedupeEvents(yd.events)) {
         const k = ev.date_sort || ev.date;
         if (!byDate[k]) byDate[k] = { label: ev.date, events: [] };
         byDate[k].events.push(ev);
@@ -256,7 +257,7 @@
             <td>
               <div class="ev-title">${esc(ev.title)}</div>
               ${ev.description ? `<div class="ev-desc">${linkifyDesc(ev.description)}</div>` : ''}
-
+              ${buildLinksHtml(ev)}
             </td>
             <td class="ev-loc">${locHtml(ev)}</td>
             <td class="ev-time">${esc(ev.finish)}</td>
@@ -310,10 +311,12 @@
     if (ev.is_online) {
       return `<span class="online-tag" aria-label="Online session">⬛ Online</span>`;
     }
-    const parts = [];
-    if (ev.room && ev.room !== 'nan' && ev.room !== '') parts.push('Room ' + ev.room);
-    if (ev.site && ev.site !== 'nan' && ev.site !== '') parts.push(ev.site);
-    return parts.length ? esc(parts.join(', ')) : '<span aria-label="Location not yet specified">—</span>';
+    const locs = getLocations(ev);
+    if (!locs.length) return '<span aria-label="Location not yet specified">—</span>';
+    if (locs.length === 1) return esc(formatLocation(locs[0]));
+    // Multi-room booking: one room/building pair per line
+    const items = locs.map(l => `<li>${esc(formatLocation(l))}</li>`).join('');
+    return `<ul class="loc-list" aria-label="${locs.length} rooms booked for this session">${items}</ul>`;
   }
 
   // ── Welcome text ─────────────────────────────────────────
@@ -380,12 +383,73 @@
 
   // ── Utilities ─────────────────────────────────────────────
 
-  // Convert [https://...] in event descriptions into accessible hyperlinks
+  // Suppress duplicate rows by Induction Module ID + Event ID.  The pipeline
+  // already does this; this guards against older data.js files.
+  function dedupeEvents(events) {
+    const seen = new Set();
+    const out = [];
+    for (const ev of events || []) {
+      const key = `${ev.mod_code || ''}|${ev.event_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(ev);
+    }
+    return out;
+  }
+
+  const notSet = v => !v || v === 'nan' || v === 'None';
+
+  // Room number + building name pairs, falling back to the legacy flat fields
+  function getLocations(ev) {
+    if (Array.isArray(ev.locations)) {
+      return ev.locations.filter(l => l && (!notSet(l.room) || !notSet(l.building)));
+    }
+    const rooms     = notSet(ev.room) ? [] : String(ev.room).split(',').map(x => x.trim()).filter(Boolean);
+    const buildings = notSet(ev.site) ? [] : String(ev.site).split(',').map(x => x.trim()).filter(Boolean);
+    const size = Math.max(rooms.length, buildings.length);
+    const out = [], seen = new Set();
+    for (let i = 0; i < size; i++) {
+      const room     = rooms.length === 1 ? rooms[0] : (rooms[i] || '');
+      const building = buildings.length === 1 ? buildings[0] : (buildings[i] || '');
+      const key = room + '|' + building;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ room, building });
+    }
+    return out;
+  }
+
+  function formatLocation(loc) {
+    return [loc.room, loc.building].filter(v => !notSet(v)).join(', ');
+  }
+
+  function safeUrl(url) {
+    const u = String(url || '').trim();
+    return /^https?:\/\//i.test(u) ? u : '';
+  }
+
+  // Meeting / resource links lifted out of Details, each on its own line
+  function buildLinksHtml(ev) {
+    const links = Array.isArray(ev.links) ? ev.links : [];
+    const html = links.map(l => {
+      const url = safeUrl(l && l.url);
+      if (!url) return '';
+      return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="ev-join-link"
+        >${esc(l.label || 'Open link')}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+    }).join('');
+    return html ? `<div class="ev-links">${html}</div>` : '';
+  }
+
+  // Fallback for older data.js files: any URL still inline in the description
+  // becomes a hyperlink on its own line, delimiters stripped.
   function linkifyDesc(text) {
     const escaped = esc(text);
-    return escaped.replace(/\[(https?:\/\/[^\]\s]+)\]/g, (m, url) =>
-      `<a href="${url}" target="_blank" rel="noopener noreferrer" class="ev-join-link" aria-label="Join online session (opens in new tab)">Join online session<span aria-hidden="true"> \u2197</span></a>`
-    );
+    return escaped.replace(/[\[\(&quot;&#39;]?\s*(https?:\/\/[^\s\[\]<>&]+)/gi, (m, rawUrl) => {
+      const url = safeUrl(rawUrl.replace(/[\]\),.;:!?]+$/, ''));
+      if (!url) return m;
+      return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="ev-join-link"
+        >Join online session<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+    });
   }
 
   function esc(s) {

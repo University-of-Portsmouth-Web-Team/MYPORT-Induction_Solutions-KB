@@ -539,13 +539,32 @@ h3 { font-size: 1.0625rem; }
   .tt-table tbody td:nth-child(3) { display: none; }
 }
 
-/* Online session join link */
+/* Screen-reader-only utility */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Multi-room bookings: one room + building pair per line */
+.loc-list { list-style: none; margin: 0; padding: 0; }
+.loc-list li { display: block; }
+.loc-list li + li { margin-top: 2px; }
+
+/* Meeting links lifted out of the event details — each on its own line */
+.ev-links { margin-top: 6px; }
+
 .ev-join-link {
-  display: inline-block;
+  display: block;
   color: var(--link);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 2px;
   margin-top: 4px;
+  overflow-wrap: anywhere;
 }
 .ev-join-link:hover { color: var(--link-h); }

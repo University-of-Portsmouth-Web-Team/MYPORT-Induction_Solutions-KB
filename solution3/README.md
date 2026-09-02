@@ -57,6 +57,15 @@ Replace `data.js` with a freshly generated file from updated spreadsheets. No ot
 
 ## Changelog
 
+**v1.9 (2026-09-02)**
+- **Duplicate events suppressed.** `dedupeEvents()` filters by Induction Module ID + Event ID before the timetable is grouped by date
+- **Room/building pairs listed one per line.** `locHtml()` now reads the paired `locations[]` array and renders a `<ul class="loc-list">`, one `room, building` pair per line, with an `aria-label` giving the room count. Multi-room bookings no longer drop room numbers or repeat the building name
+- **URLs in event details are hyperlinked on their own line.** Links extracted by the pipeline render in a `.ev-links` block below the description, each with delimiters stripped, self-describing text ("Join the Teams meeting", "Join the Zoom meeting", "Open <hostname>"), `target="_blank"`, `rel="noopener noreferrer"` and a visually hidden "(opens in a new tab)" warning
+- `linkifyDesc()` kept as a fallback for URLs still inline in an older `data.js`, now matching bare URLs as well as bracketed ones
+- Only `http(s)` hrefs are ever emitted (`safeUrl()`)
+- Location rendering falls back to zipping the legacy flat `room` / `site` fields if `locations[]` is absent
+- CSS: added `.loc-list`, `.ev-links` and an `.sr-only` utility (previously missing from this solution); `.ev-join-link` changed from `inline-block` to `block` with `overflow-wrap: anywhere`
+
 **v1.7 (2026-06-11)**
 - Online session URLs that appear in square brackets in event descriptions (e.g. Zoom links) are now rendered as real hyperlinks labelled "Join online session ↗", opening in a new tab with `rel="noopener noreferrer"` and a screen-reader hint that a new tab opens
 

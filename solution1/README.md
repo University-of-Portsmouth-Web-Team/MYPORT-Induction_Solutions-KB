@@ -57,6 +57,15 @@ To refresh from a new Scientia/SITS export, regenerate `data.js` from the update
 
 ## Changelog
 
+**v1.9 (2026-09-02)**
+- **Duplicate events suppressed.** Events are de-duplicated by Induction Module ID + Event ID before rendering, so a session booked against several course descriptors appears once. Module `I00360` now shows 11 events rather than 22
+- **Room/building pairs listed one per line.** Multi-room bookings previously showed a single room number followed by the building name repeated once per room. `buildLocationHtml()` now reads the paired `locations[]` array and renders a `<ul class="location-list">`, one `room, building` pair per line, with an `aria-label` giving the room count. "Restart a Heart" (module `I00360`) now correctly lists 11 rooms against St. Andrew's Court
+- **URLs in event details are hyperlinked on their own line.** Links extracted by the pipeline render in a `.event-links` block below the description, each as a block-level anchor with delimiters stripped and self-describing text ("Join the Teams meeting", "Join the Zoom meeting", "Open <hostname>"), `target="_blank"`, `rel="noopener noreferrer"` and a visually hidden "(opens in a new tab)" warning
+- `linkifyDescription()` kept as a fallback for any URL still sitting inline in an older `data.js`, now matching bare URLs as well as bracketed ones
+- Only `http(s)` hrefs are ever emitted (`safeUrl()`)
+- Location rendering falls back to zipping the legacy flat `room` / `site` fields if `locations[]` is absent
+- CSS: added `.location-list` and `.event-links`; `.event-join-link` changed from `inline-block` to `block` with `overflow-wrap: anywhere`
+
 **v1.8 (2026-08-27)**
 - Removed the site header (UoP logo, "MyPort" wordmark and breadcrumb) and the site footer
 - Removed the "Undergraduate Course Inductions" page hero — heading, intro paragraph and blue gradient background band

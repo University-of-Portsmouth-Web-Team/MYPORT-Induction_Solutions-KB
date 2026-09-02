@@ -245,9 +245,14 @@
       background: var(--ui-head); padding: 8px 10px;
       border-radius: 0; margin: 12px 0 0;
     }
+    .uop-ind__loc-list { list-style: none; margin: 0; padding: 0; }
+    .uop-ind__loc-list li { display: block; }
+    .uop-ind__loc-list li + li { margin-top: 2px; }
+    .uop-ind__ev-links { margin-top: 6px; }
     .uop-ind__join-link {
-      display: inline-block; color: var(--ui-link); font-weight: 600;
+      display: block; color: var(--ui-link); font-weight: 600;
       text-decoration: underline; text-underline-offset: 2px; margin-top: 4px;
+      overflow-wrap: anywhere;
     }
     .uop-ind__join-link:hover { color: var(--ui-link-h); }
     .uop-ind__no-events { text-align: center; padding: 32px 16px; color: var(--ui-txtm); font-size: 0.9375rem; }
@@ -541,7 +546,8 @@
         ttHtml = `<div class="uop-ind__no-events" role="alert">No induction events scheduled yet. Please check back later or contact your School office.</div>`;
       } else {
         const byDate = {};
-        for (const ev of yd.events) {
+        // Duplicate rows suppressed by Induction Module ID + Event ID
+        for (const ev of this.dedupeEvents(yd.events)) {
           const k = ev.date_sort || ev.date;
           if (!byDate[k]) byDate[k] = { label: ev.date, events: [] };
           byDate[k].events.push(ev);
@@ -558,7 +564,7 @@
               <td>
                 <div class="uop-ind__ev-title">${this.escHtml(ev.title)}</div>
                 ${ev.description ? `<div class="uop-ind__ev-desc">${this.linkifyDescription(ev.description)}</div>` : ''}
-
+                ${this.buildLinksHtml(ev)}
               </td>
               <td class="uop-ind__ev-loc">${this.buildLoc(ev)}</td>
               <td class="uop-ind__ev-time">${this.escHtml(ev.finish)}</td>
@@ -603,10 +609,69 @@
       if (ev.is_online) {
         return `<span class="uop-ind__online-badge" aria-label="Online session">⬛ Online</span>`;
       }
-      const parts = [];
-      if (ev.room && ev.room !== 'nan' && ev.room !== '') parts.push('Room ' + ev.room);
-      if (ev.site && ev.site !== 'nan' && ev.site !== '') parts.push(ev.site);
-      return parts.length ? this.escHtml(parts.join(', ')) : '—';
+      const locs = this.getLocations(ev);
+      if (!locs.length) return '—';
+      if (locs.length === 1) return this.escHtml(this.formatLocation(locs[0]));
+      // Multi-room booking: one room/building pair per line
+      const items = locs.map(l => `<li>${this.escHtml(this.formatLocation(l))}</li>`).join('');
+      return `<ul class="uop-ind__loc-list" aria-label="${locs.length} rooms booked for this session">${items}</ul>`;
+    }
+
+    // Suppress duplicate rows by Induction Module ID + Event ID.  The pipeline
+    // already does this; this guards against older data.js files.
+    dedupeEvents(events) {
+      const seen = new Set();
+      const out = [];
+      for (const ev of events || []) {
+        const key = (ev.mod_code || '') + '|' + ev.event_id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(ev);
+      }
+      return out;
+    }
+
+    notSet(v) { return !v || v === 'nan' || v === 'None'; }
+
+    // Room number + building name pairs, falling back to the legacy flat fields
+    getLocations(ev) {
+      if (Array.isArray(ev.locations)) {
+        return ev.locations.filter(l => l && (!this.notSet(l.room) || !this.notSet(l.building)));
+      }
+      const rooms     = this.notSet(ev.room) ? [] : String(ev.room).split(',').map(x => x.trim()).filter(Boolean);
+      const buildings = this.notSet(ev.site) ? [] : String(ev.site).split(',').map(x => x.trim()).filter(Boolean);
+      const size = Math.max(rooms.length, buildings.length);
+      const out = [], seen = new Set();
+      for (let i = 0; i < size; i++) {
+        const room     = rooms.length === 1 ? rooms[0] : (rooms[i] || '');
+        const building = buildings.length === 1 ? buildings[0] : (buildings[i] || '');
+        const key = room + '|' + building;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ room, building });
+      }
+      return out;
+    }
+
+    formatLocation(loc) {
+      return [loc.room, loc.building].filter(v => !this.notSet(v)).join(', ');
+    }
+
+    safeUrl(url) {
+      const u = String(url || '').trim();
+      return /^https?:\/\//i.test(u) ? u : '';
+    }
+
+    // Meeting / resource links lifted out of Details, each on its own line
+    buildLinksHtml(ev) {
+      const links = Array.isArray(ev.links) ? ev.links : [];
+      const html = links.map(l => {
+        const url = this.safeUrl(l && l.url);
+        if (!url) return '';
+        return `<a href="${this.escHtml(url)}" target="_blank" rel="noopener noreferrer" class="uop-ind__join-link"
+          >${this.escHtml(l.label || 'Open link')}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+      }).join('');
+      return html ? `<div class="uop-ind__ev-links">${html}</div>` : '';
     }
 
     getWelcomeTexts(type, year) {
@@ -628,11 +693,16 @@
       }
     }
 
+    // Fallback for older data.js files: any URL still inline in the description
+    // becomes a hyperlink on its own line, delimiters stripped.
     linkifyDescription(text) {
       const escaped = this.escHtml(text);
-      return escaped.replace(/\[(https?:\/\/[^\]\s]+)\]/g, (m, url) =>
-        `<a href="${url}" target="_blank" rel="noopener noreferrer" class="uop-ind__join-link" aria-label="Join online session (opens in new tab)">Join online session<span aria-hidden="true"> \u2197</span></a>`
-      );
+      return escaped.replace(/[\[\(&quot;&#39;]?\s*(https?:\/\/[^\s\[\]<>&]+)/gi, (m, rawUrl) => {
+        const url = this.safeUrl(rawUrl.replace(/[\]\),.;:!?]+$/, ''));
+        if (!url) return m;
+        return `<a href="${this.escHtml(url)}" target="_blank" rel="noopener noreferrer" class="uop-ind__join-link"
+          >Join online session<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+      });
     }
 
     escHtml(str) {

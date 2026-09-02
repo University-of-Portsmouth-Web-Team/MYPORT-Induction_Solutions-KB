@@ -137,9 +137,12 @@ git push
 | `Weeks` | Date (datetime column) |
 | `Time` / `Finish` | Start and end times (HH:MM:SS) |
 | `Module` | FK → `Mod Code` |
-| `Details` | `Event title, description` — split on the first comma |
-| `Site` | Building name |
-| `Room` | Room number; `Online` / `Online13` = virtual event |
+| `Details` | `Event title, description` — split on the first comma, **after** any URLs have been lifted out |
+| `Site` | **Room number(s)** — despite the column name. Comma-separated list for multi-room bookings |
+| `Room` | **Building name(s)** — despite the column name. Parallel list, same length as `Site`; `Online…` = virtual event |
+
+> ⚠️ **`Site` and `Room` are transposed in the export.** The pipeline swaps them
+> back on read — see [Data-quality workarounds](#data-quality-workarounds-v19).
 
 ---
 
@@ -181,6 +184,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.9 | 2026-09-02 | **Data-quality workarounds for the 2026/27 export.** Duplicate event rows suppressed by Induction Module ID + Event ID (10,077 → 3,206 rows). Transposed `Site`/`Room` columns un-swapped and their parallel lists zipped into room + building pairs, listed one per line — multi-room bookings no longer lose rooms or repeat the building. URLs in `Details` extracted into their own field, delimiters stripped, and rendered as a hyperlink on a new line |
 | v1.8 | 2026-08-27 | **Solution 1** stripped of site header, breadcrumb, page hero and footer — page now opens on the search bar; visually hidden `<h1>` retained for accessibility. **All solutions:** four broken MyPort links corrected (IT Support, International, Campus maps, Library) |
 | v1.7 | 2026-06-11 | Bracketed online-session URLs in event descriptions converted to accessible "Join online session" hyperlinks (new tab, noopener) |
 | v1.6 | 2026-06-11 | Course names purple everywhere; A–Z index buttons clearly clickable; zero radius across all components; purple date separator bands; official UoP logo/favicon |
@@ -190,6 +194,100 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 | v1.2 | 2026-06-08 | Courses with no timetable events hidden from search |
 | v1.1 | 2026-06-08 | A–Z index by subject title; removed per-event IDs; footnotes; S1 sidebar cleaned up |
 | v1.0 | 2026-06-03 | Initial three-solution proof of concept |
+
+---
+
+## Data-quality workarounds (v1.9)
+
+The 2026/27 timetable export (`data/ind_tt_20260902.xlsx`) arrived with several
+faults that are not present in the requirement and cannot be fixed upstream in
+time. The pipeline works around them on read. **None of these workarounds
+change what the timetabling team needs to supply** — if a future export is
+clean, they simply become no-ops.
+
+### 1. Duplicate event rows
+
+The export emits one row per *induction module × course descriptor*, so the
+same `Event Id` repeats many times over. Rows are now de-duplicated on
+`(Module, Event Id)`, keeping the first.
+
+| | Rows |
+|---|---|
+| Raw export | 10,077 |
+| Unique `Module` + `Event Id` | 3,206 |
+| Suppressed | 6,871 |
+
+This is **lossless**: every timetable-bearing column (`Weeks`, `Day`, `Time`,
+`Finish`, `Details`, `Site`, `Room`) was verified identical within all 3,206
+groups. Only the `Mod` course-descriptor string varies, and that is not used
+by the timetable view.
+
+All three renderers also de-duplicate defensively at render time, so an older
+`data.js` still displays correctly.
+
+### 2. Transposed `Site` / `Room` columns
+
+The export puts the **room number** in `Site` and the **building name** in
+`Room`. These are swapped back on read, so the emitted data has `room` =
+room number and `site` = building name.
+
+### 3. Parallel room lists (the reported bug)
+
+Multi-room bookings arrive as two comma-separated lists of **equal length** —
+one entry per booked room:
+
+```
+Site: "2.01, 2.02, 2.03, 2.04, 2.05, 2.14, 2.15, 2.16, 2.17, 3.04, 3.05"
+Room: "St. Andrew's Court, St. Andrew's Court, St. Andrew's Court, …"   (×11)
+```
+
+The previous pipeline kept only the **first** `Site` value and printed the
+whole `Room` string, which is why room numbers disappeared and the building
+appeared repeated. The two lists are now zipped index-for-index into
+`locations[]` room/building pairs and rendered one pair per line:
+
+> 📍 2.01, St. Andrew's Court
+> 2.02, St. Andrew's Court
+> … (11 lines)
+
+Verified across all 10,077 rows: the two lists are **always** the same length,
+so the zip never drops a value. If a future export does mismatch, a single
+value on one side is broadcast across the other, and anything else is padded
+rather than truncated. Identical repeated pairs are collapsed.
+
+327 events are multi-room. Example: module `I00360` (BSc (Hons) Diagnostic
+Radiography and Medical Imaging, Year 1) now shows **11 events**, with the
+"Restart a Heart" session listing **11 rooms** against St. Andrew's Court.
+
+### 4. URLs inside `Details`
+
+Meeting links appear inline, sometimes wrapped in `[square brackets]`, and in
+one case *in front of* the session name — where the title/description comma
+split swallowed it as the title. URLs are now lifted out of `Details`
+**before** that split, then emitted as `links[]` and rendered as a hyperlink on
+its own line (`target="_blank"`, `rel="noopener noreferrer"`, with a
+screen-reader "opens in a new tab" warning).
+
+Handled on extraction:
+
+- Surrounding delimiters `[ ] ( ) < > " '` and trailing punctuation stripped
+- Dangling connector labels removed (`Meeting link:`, `Microsoft Teams Link:`,
+  `Help session link:` — left behind once the URL is gone)
+- Doubled commas around the removal point tidied
+- Duplicate URLs within one event collapsed
+- Link text derived from the host: *Join the Teams meeting*, *Join the Zoom
+  meeting*, or *Open &lt;hostname&gt;* for anything else
+
+**358 events** now carry a working link.
+
+### Known faults left alone deliberately
+
+| Fault | Why | Action |
+|---|---|---|
+| Three Teams `meetup-join` URLs truncated mid-string by the export's field-length limit | A "Join the Teams meeting" button that 404s is worse for a student than visible raw text | Left as plain text so the School notices. Detected by the absence of `%40thread` |
+| One `https://student-system` with no TLD | Same — cannot resolve | Left as plain text |
+| Mojibake in at least one description (`KarenÂ¿s recent research`) | Character-encoding fault at source; guessing the intended character risks corrupting other rows | **Raise with the timetabling team** |
+| Descriptions truncated mid-word (`…get the most out of librar`) | Field-length limit at source | **Raise with the timetabling team** |
 
 ---
 
