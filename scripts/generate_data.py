@@ -101,6 +101,36 @@ def format_time(t) -> str:
     return s
 
 
+_TIME_12H_RE = re.compile(r"^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$", re.IGNORECASE)
+
+
+def time_to_minutes(value) -> int:
+    """Minutes past midnight for a formatted time such as '9:00am' or '12:30pm'.
+
+    Used as a sort key so that events order chronologically.  A plain string
+    sort puts '9:00am' after '10:00am' and after every pm time, because it
+    compares '9' against '1' character by character.  Blank or unparseable
+    values sort last rather than jumping to the top of a day.
+    """
+    if not value:
+        return 10 ** 9
+    s = str(value).strip()
+    m = _TIME_12H_RE.match(s)
+    if m:
+        hours = int(m.group(1)) % 12
+        if m.group(3).lower() == "p":
+            hours += 12
+        return hours * 60 + int(m.group(2) or 0)
+    # Fallback: 24-hour "HH:MM" / "HH:MM:SS"
+    parts = s.split(":")
+    if len(parts) >= 2:
+        try:
+            return int(parts[0]) * 60 + int(parts[1])
+        except ValueError:
+            pass
+    return 10 ** 9
+
+
 def format_date(d) -> str:
     if pd.isna(d):
         return ""
@@ -387,7 +417,10 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
 
     # Sort each module's events by date then time
     for mod_code in events_by_mod:
-        events_by_mod[mod_code].sort(key=lambda x: (x["date_sort"], x["time"]))
+        events_by_mod[mod_code].sort(
+            key=lambda x: (x["date_sort"], time_to_minutes(x["time"]),
+                           time_to_minutes(x.get("finish")), x.get("title") or "")
+        )
 
     # Assemble per-course structure
     courses_data: dict[str, dict] = {}
