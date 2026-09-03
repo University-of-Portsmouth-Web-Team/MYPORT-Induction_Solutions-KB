@@ -6,6 +6,17 @@
   <title>Course Induction Timetables | University of Portsmouth</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="description" content="Find your course induction timetable at the University of Portsmouth. Search by course name to see your induction schedule.">
+  <!-- Google tag (gtag.js) — GA4 data stream "Induction Timetables" (INS-873).
+       Engagement inside this app is measured with custom events (see analytics.js),
+       because GA4 strips the "#" fragment our routing depends on. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BVP9PTRZJL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BVP9PTRZJL');
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Encode+Sans+Expanded:wght@500;700&display=swap" rel="stylesheet">
@@ -129,6 +140,7 @@
   </main>
 
   <script src="data.js"></script>
+  <script src="analytics.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

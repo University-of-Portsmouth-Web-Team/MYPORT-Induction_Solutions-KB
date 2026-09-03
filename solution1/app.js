@@ -36,6 +36,25 @@
 
   const YEAR_LABELS = { 0: 'Foundation Year', 1: 'Year 1', 2: 'Year 2', 3: 'Year 3', 4: 'Year 4', 5: 'Year 5', 6: 'Year 6' };
 
+  // ── Analytics (INS-873) ────────────────────────────────────
+  // Thin, fail-safe wrapper around analytics.js. If that file is
+  // missing, blocked by an ad blocker, or the Google tag fails to
+  // load, every call below becomes a silent no-op and the timetable
+  // carries on working exactly as before.
+  function track(method) {
+    try {
+      const a = window.UOPAnalytics;
+      if (a && typeof a[method] === 'function') {
+        return a[method].apply(a, Array.prototype.slice.call(arguments, 1));
+      }
+    } catch (e) { /* analytics must never break the app */ }
+    return false;
+  }
+
+  function yearLabelFor(year) {
+    return YEAR_LABELS[year] || `Year ${year}`;
+  }
+
   // ── Welcome text templates ─────────────────────────────────
   function getWelcomeText(courseType, year) {
     if (courseType === 'UG' && year === 1) {
@@ -118,6 +137,7 @@
         btn.setAttribute('aria-pressed', 'true');
         currentFilter = btn.dataset.filter;
         applyFilters();
+        track('trackFilter', currentFilter);
       });
     });
 
@@ -132,6 +152,10 @@
   function handleSearch() {
     currentSearch = $searchInput.value.trim().toLowerCase();
     applyFilters();
+    // Fired after filtering so the result count is accurate. Already
+    // debounced by the 300ms timer on the input listener, so this is
+    // one event per settled search rather than one per keystroke.
+    track('trackSearch', currentSearch, filteredCourses.length);
   }
 
   function applyFilters() {
@@ -176,6 +200,9 @@
       if (letters.has(l)) {
         a.href = `#letter-${l}`;
         a.setAttribute('aria-label', `Jump to courses beginning with ${l}`);
+        // Listener only — default anchor behaviour (and its focus
+        // handling) is deliberately left untouched for accessibility.
+        a.addEventListener('click', () => track('trackAlphaClick', l));
       } else {
         a.setAttribute('aria-disabled', 'true');
         a.role = 'none';
@@ -284,6 +311,11 @@
     const newHash = `#detail/${slug}/${yearStr}`;
     history.pushState({ view: 'detail', courseName: course.name, year }, '', newHash);
 
+    track('trackCourseView', course.name, yearLabelFor(year), {
+      courseType: course.course_type,
+      entryMethod: 'listing'
+    });
+
     renderDetail(course, year);
     showView('detail');
     $detailCourseName.focus();
@@ -312,6 +344,29 @@
       btn.textContent = YEAR_LABELS[y.year] || `Year ${y.year}`;
       btn.addEventListener('click', () => {
         currentYear = y.year;
+
+        // Keep the address bar honest. Switching year inside the detail
+        // view previously left the URL pointing at the year the user
+        // arrived on, so "copy link" shared the wrong timetable.
+        // replaceState (not pushState) so the back button still returns
+        // to the listing rather than stepping through every year tab.
+        try {
+          const slug = slugify(course.name);
+          const yearStr = YEAR_LABELS[y.year]
+            ? YEAR_LABELS[y.year].toLowerCase().replace(' ', '-')
+            : `year-${y.year}`;
+          history.replaceState(
+            { view: 'detail', courseName: course.name, year: y.year },
+            '',
+            `#detail/${slug}/${yearStr}`
+          );
+        } catch (e) { /* non-fatal */ }
+
+        track('trackCourseView', course.name, yearLabelFor(y.year), {
+          courseType: course.course_type,
+          entryMethod: 'year_tab'
+        });
+
         renderDetail(course, y.year);
       });
       $detailYearTabs.appendChild(btn);
@@ -422,6 +477,9 @@
 
   function showListing() {
     history.pushState({ view: 'listing' }, '', window.location.pathname);
+    // Returning to the listing ends the current timetable view, so
+    // re-opening the same course + year later counts as a new view.
+    track('resetCourseView');
     showView('listing');
   }
 
@@ -435,8 +493,14 @@
       if (course) {
         const yearStr = parts[1] || 'year-1';
         const year = yearFromStr(yearStr);
-        const actualYear = course.years[year] ? year : Object.keys(course.years)[0];
-        renderDetail(course, parseInt(actualYear, 10));
+        const actualYear = parseInt(course.years[year] ? year : Object.keys(course.years)[0], 10);
+
+        track('trackCourseView', course.name, yearLabelFor(actualYear), {
+          courseType: course.course_type,
+          entryMethod: 'deep_link'
+        });
+
+        renderDetail(course, actualYear);
         showView('detail');
         return;
       }

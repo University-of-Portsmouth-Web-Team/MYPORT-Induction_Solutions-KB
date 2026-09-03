@@ -11,6 +11,7 @@ The page is deliberately **chrome-free**: there is no site header, breadcrumb, p
 | `index.html` | Entry point |
 | `styles.css` | All styles |
 | `app.js` | Application logic |
+| `analytics.js` | GA4 custom-event tracking (INS-873) |
 | `data.js` | Timetable data |
 | `favicon.png` | UoP logo — favicon |
 
@@ -32,6 +33,7 @@ Open `index.html` in a browser, or deploy to any static host (GitHub Pages, Netl
 - Queries, International Students, and Further Information sections
 - Hash-based routing for deep linking and browser back/forward
 - WCAG 2.2 AA compliant
+- GA4 custom-event analytics that degrade silently if the tag is blocked
 
 ## Design system
 
@@ -55,7 +57,62 @@ Typography matches MyPort: **Open Sans** for body text and **Encode Sans Expande
 
 To refresh from a new Scientia/SITS export, regenerate `data.js` from the updated spreadsheets and drop it in alongside the other files. The rest of the site requires no changes.
 
+## Analytics
+
+Tracking is implemented as **GA4 custom events**, not page views.
+
+The app routes on the URL fragment (`…/solution1/#detail/{course-slug}/{year-n}`). GA4's page-path reporting dimensions exclude everything after the `#`, so a page-view-based setup would have recorded every screen as `/MYPORT-Induction_Solutions-KB/solution1/` and told us nothing. Custom events sidestep the problem entirely by carrying the course and year as event parameters.
+
+### Events
+
+| Event | Parameters | Fires when |
+|-------|-----------|------------|
+| `course_view` | `course_name`, `year`, `course_type`, `entry_method` | A course timetable is opened |
+| `course_search` | `search_term`, `result_count` | A keyword search settles (debounced, 300ms) |
+| `alpha_index_click` | `letter` | The A–Z index is used |
+| `course_filter` | `filter` | The All / Undergraduate / Postgraduate filter changes |
+
+### `course_view` parameters
+
+| Parameter | Example | Notes |
+|-----------|---------|-------|
+| `course_name` | `BA (Hons) Criminology and Forensic Investigation` | Plain course title exactly as shown to the user — not a slug or ID |
+| `year` | `Year 1`, `Foundation Year` | The label, not a number, because "Foundation Year" has no numeric equivalent |
+| `course_type` | `UG`, `PGT`, `Other` | From the source data |
+| `entry_method` | `listing`, `year_tab`, `deep_link` | How the user reached the timetable — see below |
+
+`entry_method` distinguishes opening a course from the search listing, switching year using the tabs once already inside a course, and arriving directly on a shared or bookmarked link.
+
+### GA4 setup required
+
+These parameters need registering as **custom dimensions** (Admin → Custom definitions → Create custom dimension, scope: Event) before they appear in reports. Parameters are only collected from the point the dimension is created — they are not backfilled.
+
+Recommended: turn **off** Enhanced measurement → Page views → *"Page changes based on browser history events"* for this data stream. The app uses `pushState` for routing and the A–Z index uses real anchor links, so leaving it on generates page views that carry no useful path.
+
+### Verifying without GA4 access
+
+Append `?uop_debug=1` to the URL and every event is logged to the browser console as it fires:
+
+```
+https://university-of-portsmouth-web-team.github.io/MYPORT-Induction_Solutions-KB/solution1/?uop_debug=1
+```
+
+Setting `window.UOP_ANALYTICS_DEBUG = true` in the console does the same. This works whether or not the Google tag itself loaded.
+
+### Privacy
+
+No personal data is collected — only course names, years and search terms. `search_term` is free text, so in principle a student could type something identifying into it; the field is capped at 60 characters and this is worth a look during validation. Cookie consent for this data stream is an open question, since the app is served from `github.io` rather than `port.ac.uk` and so sits outside MyPort's consent banner.
+
 ## Changelog
+
+**v2.0 (2026-09-03)**
+- **GA4 analytics added (INS-873).** Google tag `G-BVP9PTRZJL` ("Induction Timetables" data stream on the MyPort property) added to `index.html`, with all tracking logic in a new self-contained `analytics.js`
+- **`course_view` custom event** fires whenever a timetable is opened, carrying `course_name`, `year`, `course_type` and `entry_method`. This replaces the page-view approach, which could not work: GA4's page-path dimensions strip everything after the `#`, so all screens would have collapsed into a single row for `/solution1/`
+- **Supporting events** `course_search`, `alpha_index_click` and `course_filter` answer the original question in the ticket about whether students prefer keyword search or the A–Z index. They are independent of `course_view` and can be removed without affecting it
+- **De-duplication.** `course_view` will not fire twice for the same course + year in a row. The guard clears on return to the listing, so genuinely re-opening a timetable is counted again
+- **Fail-safe by design.** Every tracking call is wrapped and guarded on `gtag` being present. If `analytics.js` is missing, the Google tag is blocked, or there is no network, the timetable works exactly as before
+- **Fixed: detail-view year tabs left the URL stale.** Switching year inside a course re-rendered in place without updating the address bar, so "copy link" shared whichever year the user first arrived on. Now kept in sync with `replaceState` — chosen over `pushState` so the back button still returns to the listing rather than stepping through every year tab
+- Parameter values are capped at GA4's 100-character limit (longest current course name is 84, so nothing is truncated in practice)
 
 **v1.9 (2026-09-02)**
 - **Duplicate events suppressed.** Events are de-duplicated by Induction Module ID + Event ID before rendering, so a session booked against several course descriptors appears once. Module `I00360` now shows 11 events rather than 22
