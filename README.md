@@ -184,6 +184,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.10 | 2026-09-03 | **Events now sort chronologically within each day.** All three solutions compared start times as plain strings, so `9:00am` sorted after `10:00am` and after every afternoon session, pushing early-morning events to the bottom of the day. Times are now parsed to minutes past midnight before sorting. Affected 150 of 724 multi-event day blocks (20.7%). The same string-sort key in `scripts/generate_data.py` was corrected too. No change to the data format |
 | v1.9 | 2026-09-02 | **Data-quality workarounds for the 2026/27 export.** Duplicate event rows suppressed by Induction Module ID + Event ID (10,077 → 3,206 rows). Transposed `Site`/`Room` columns un-swapped and their parallel lists zipped into room + building pairs, listed one per line — multi-room bookings no longer lose rooms or repeat the building. URLs in `Details` extracted into their own field, delimiters stripped, and rendered as a hyperlink on a new line |
 | v1.8 | 2026-08-27 | **Solution 1** stripped of site header, breadcrumb, page hero and footer — page now opens on the search bar; visually hidden `<h1>` retained for accessibility. **All solutions:** four broken MyPort links corrected (IT Support, International, Campus maps, Library) |
 | v1.7 | 2026-06-11 | Bracketed online-session URLs in event descriptions converted to accessible "Join online session" hyperlinks (new tab, noopener) |

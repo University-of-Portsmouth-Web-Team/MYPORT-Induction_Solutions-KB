@@ -368,7 +368,7 @@
             </tr>
           </thead>
           <tbody>`;
-      for (const ev of group.events.sort((a, b) => (a.time > b.time ? 1 : -1))) {
+      for (const ev of group.events.slice().sort(compareEventsByTime)) {
         const locationHtml = buildLocationHtml(ev);
         html += `<tr>
           <td class="event-time">${escHtml(ev.time)}</td>
@@ -455,6 +455,34 @@
   // Suppress duplicate rows by Induction Module ID + Event ID.  The pipeline
   // already does this, but older data.js files repeat every event once per
   // course descriptor, so we guard here too.
+  /**
+   * Convert a 12-hour clock string ("9:00am", "12:30pm") to minutes past midnight.
+   * Returns Number.MAX_SAFE_INTEGER for missing/unparseable values so they sort last
+   * rather than jumping to the top of a day.
+   */
+  function timeToMinutes(value) {
+    if (!value) return Number.MAX_SAFE_INTEGER;
+    const m = String(value).trim().match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i);
+    if (m) {
+      let hours = parseInt(m[1], 10) % 12;
+      if (m[3].toLowerCase() === 'p') hours += 12;
+      return hours * 60 + (m[2] ? parseInt(m[2], 10) : 0);
+    }
+    // Fallback: 24-hour format ("09:00", "14:30")
+    const m24 = String(value).trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (m24) return parseInt(m24[1], 10) * 60 + parseInt(m24[2], 10);
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  /** Chronological comparator for events within a single day. */
+  function compareEventsByTime(a, b) {
+    const diff = timeToMinutes(a.time) - timeToMinutes(b.time);
+    if (diff !== 0) return diff;
+    const finishDiff = timeToMinutes(a.finish) - timeToMinutes(b.finish);
+    if (finishDiff !== 0) return finishDiff;
+    return String(a.title || '').localeCompare(String(b.title || ''));
+  }
+
   function dedupeEvents(events) {
     const seen = new Set();
     const out = [];

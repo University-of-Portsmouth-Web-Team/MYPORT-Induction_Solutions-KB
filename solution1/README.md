@@ -57,6 +57,13 @@ To refresh from a new Scientia/SITS export, regenerate `data.js` from the update
 
 ## Changelog
 
+**v1.10 (2026-09-03)**
+- **Fixed: induction events now list in time order within each day.** The timetable sorted events with `a.time > b.time`, a plain string comparison against 12-hour clock labels such as `9:00am`. Because `'9'` is greater than `'1'`, every `9:xxam` session sorted after `10:00am`, `11:00am` and all afternoon sessions, appearing at the bottom of its day instead of the top
+- Added `timeToMinutes()`, which parses a 12-hour label to minutes past midnight (handling `12:00am` as 0 and `12:00pm` as 720), and `compareEventsByTime()`, which sorts on start time, then finish time, then title for a stable order
+- Reported by an academic against BSc (Hons) Cyber Security and Forensic Computing (Year 1 Mon 14th, Year 2 Tues 15th and Thurs 17th, Year 3 Thurs 17th). A sweep of the full dataset found the same fault in 150 of 724 multi-event day blocks (20.7%) across the catalogue, plus a fifth occurrence in that course the report had not listed (Year 1, Wed 16th)
+- Unparseable or blank times sort last rather than jumping to the top of the day
+- No change to the shape of `data.js` — the fix reads the existing `time` field
+
 **v1.9 (2026-09-02)**
 - **Duplicate events suppressed.** Events are de-duplicated by Induction Module ID + Event ID before rendering, so a session booked against several course descriptors appears once. Module `I00360` now shows 11 events rather than 22
 - **Room/building pairs listed one per line.** Multi-room bookings previously showed a single room number followed by the building name repeated once per room. `buildLocationHtml()` now reads the paired `locations[]` array and renders a `<ul class="location-list">`, one `room, building` pair per line, with an `aria-label` giving the room count. "Restart a Heart" (module `I00360`) now correctly lists 11 rooms against St. Andrew's Court

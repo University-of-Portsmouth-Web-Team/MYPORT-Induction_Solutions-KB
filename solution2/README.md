@@ -80,6 +80,13 @@ Replace `data.js` with a freshly generated file from updated spreadsheets. No ot
 
 ## Changelog
 
+**v1.10 (2026-09-03)**
+- **Fixed: induction events now list in time order within each day.** The timetable sorted events with `a.time > b.time`, a plain string comparison against 12-hour clock labels such as `9:00am`. Because `'9'` is greater than `'1'`, every `9:xxam` session sorted after `10:00am`, `11:00am` and all afternoon sessions, appearing at the bottom of its day instead of the top
+- Added `timeToMinutes()` and `compareEventsByTime()` methods to the widget class, sorting on start time, then finish time, then title
+- The same fault affected 150 of 724 multi-event day blocks (20.7%) across the catalogue
+- Unparseable or blank times sort last rather than jumping to the top of the day
+- No change to the shape of `data.js` — the fix reads the existing `time` field
+
 **v1.9 (2026-09-02)**
 - **Duplicate events suppressed.** `dedupeEvents()` filters by Induction Module ID + Event ID before the timetable is grouped by date
 - **Room/building pairs listed one per line.** `buildLoc()` now reads the paired `locations[]` array and renders a `<ul class="uop-ind__loc-list">`, one `room, building` pair per line, with an `aria-label` giving the room count. Multi-room bookings no longer drop room numbers or repeat the building name
