@@ -173,6 +173,8 @@
       padding: 12px 20px 8px; gap: 12px;
     }
     .uop-ind__course-nm { font-size: 0.9375rem; font-weight: 600; color: var(--ui-head); }
+    /* Course code beside the name, only where two courses share a name (WD-1076). */
+    .uop-ind__course-code { font-size: 0.8125rem; font-weight: 400; color: var(--ui-txtm); white-space: nowrap; }
     .uop-ind__badge {
       font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.05em;
       text-transform: uppercase; padding: 2px 8px; border-radius: 0; flex-shrink: 0;
@@ -297,6 +299,58 @@
     document.head.appendChild(style);
   }
 
+  // ── Course identity (WD-1076) ──────────────────────────────────
+  // A course is identified by its course code, never by its name. Several
+  // courses can share a name — typically the full-time and part-time routes
+  // of one degree — and matching on the name opened whichever happened to be
+  // first. Each helper falls back to the old behaviour so an older data.js
+  // still renders.
+  function slugifyName(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  function courseSlug(c) { return c.slug || slugifyName(c.name); }
+  function courseId(c)   { return c.id || c.crs_code || c.name; }
+  // The course code is only worth showing when another course the student can
+  // actually see shares the name. A course whose twin has no timetabled
+  // sessions is hidden from the listing, so appending a code there would be
+  // noise rather than a disambiguator. Each widget instance filters its own
+  // list, so the set is held per instance.
+  function indexSharedNames(courses) {
+    const counts = new Map();
+    for (const c of courses) {
+      const k = c.name.toLowerCase();
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    return new Set([...counts].filter(([, n]) => n > 1).map(([k]) => k));
+  }
+
+  function courseQualifier(c, shared) {
+    if (!c.name_qualifier) return '';
+    if (shared && !shared.has(c.name.toLowerCase())) return '';
+    return c.name_qualifier;
+  }
+  function courseFullName(c, shared) {
+    const q = courseQualifier(c, shared);
+    return q ? c.name + ' (' + q + ')' : c.name;
+  }
+
+  function normaliseForSearch(v) {
+    return String(v).toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // Display name, the other spellings the export used for this course, and
+  // the course code. Punctuation is flattened so a missing space in the
+  // source data still matches what a student would type — and so an embed can
+  // be pinned to a course code rather than to an ambiguous name.
+  function searchHaystack(c) {
+    if (!c.__haystack) {
+      c.__haystack = normaliseForSearch(
+        [c.name].concat(c.name_variants || [], [c.crs_code || '']).join(' '));
+    }
+    return c.__haystack;
+  }
+
   // ── Widget class ───────────────────────────────────────────
   function subjectSortKey(name) {
     return name
@@ -315,7 +369,7 @@
       this.allCourses = [];
       this.filteredCourses = [];
       this.currentFilter = this.presetType || 'all';
-      this.currentSearch = this.presetCourse || '';
+      this.currentSearch = this.presetCourse ? normaliseForSearch(this.presetCourse) : '';
       this.currentView = 'listing';
       this.currentCourse = null;
       this.currentYear = null;
@@ -426,19 +480,20 @@
         return;
       }
       this.allCourses = data.filter(c => Object.values(c.years).some(y => y.events.length > 0));
+      this.sharedNames = indexSharedNames(this.allCourses);
       this.filteredCourses = data;
       if (this.currentSearch) this.applyFilters();
       else this.applyFilters();
     }
 
     doSearch() {
-      this.currentSearch = this.$search.value.trim().toLowerCase();
+      this.currentSearch = normaliseForSearch(this.$search.value);
       this.applyFilters();
     }
 
     applyFilters() {
       this.filteredCourses = this.allCourses.filter(c => {
-        const ms = !this.currentSearch || c.name.toLowerCase().includes(this.currentSearch);
+        const ms = !this.currentSearch || searchHaystack(c).includes(this.currentSearch);
         const mf = this.currentFilter === 'all' || c.course_type === this.currentFilter;
         return ms && mf;
       });
@@ -484,16 +539,17 @@
             const cnt = y.events.length;
             const lbl = YEAR_LABELS[y.year] || `Year ${y.year}`;
             return `<button type="button" class="uop-ind__year-btn"
-              data-course="${this.escHtml(c.name)}"
+              data-course-id="${this.escHtml(courseId(c))}"
               data-year="${y.year}"
-              aria-label="${this.escHtml(c.name)}, ${lbl}${cnt ? ', ' + cnt + ' session' + (cnt !== 1 ? 's' : '') : ''}">
+              aria-label="${this.escHtml(courseFullName(c, this.sharedNames))}, ${lbl}${cnt ? ', ' + cnt + ' session' + (cnt !== 1 ? 's' : '') : ''}">
               ${this.escHtml(lbl)}
               ${cnt ? `<span class="uop-ind__ev-cnt" aria-hidden="true">${cnt}</span>` : ''}
             </button>`;
           }).join('');
           html += `<li class="uop-ind__course-item">
             <div class="uop-ind__course-hd">
-              <span class="uop-ind__course-nm">${this.escHtml(c.name)}</span>
+              <span class="uop-ind__course-nm">${this.escHtml(c.name)}${courseQualifier(c, this.sharedNames)
+                ? ` <span class="uop-ind__course-code">(${this.escHtml(courseQualifier(c, this.sharedNames))})</span>` : ''}</span>
               <span class="uop-ind__badge uop-ind__badge-${c.course_type}" aria-label="${typeLabel}">${typeLabel}</span>
             </div>
             <div class="uop-ind__year-row">${yearBtns}</div>
@@ -504,7 +560,8 @@
       this.$list.innerHTML = html;
       this.$list.querySelectorAll('.uop-ind__year-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const course = this.allCourses.find(c => c.name === btn.dataset.course);
+          // Looked up by course code, not by name (WD-1076).
+          const course = this.allCourses.find(c => courseId(c) === btn.dataset.courseId);
           if (course) this.showDetail(course, parseInt(btn.dataset.year, 10));
         });
       });
@@ -531,6 +588,8 @@
 
     renderDetail(course, year) {
       const yd = course.years[year];
+      // A course-year can carry more than one induction module (WD-1076).
+      const modCodes = yd ? (yd.mod_codes || [yd.mod_code]).filter(Boolean) : [];
       const yl = YEAR_LABELS[year] || `Year ${year}`;
       const texts = this.getWelcomeTexts(course.course_type, year);
       const sortedYears = Object.values(course.years).sort((a, b) => a.year - b.year);
@@ -575,7 +634,7 @@
       }
 
       this.$detailDiv.innerHTML = `<div class="uop-ind__detail-inner">
-        <h2 class="uop-ind__detail-h1" tabindex="-1">${this.escHtml(course.name)}</h2>
+        <h2 class="uop-ind__detail-h1" tabindex="-1">${this.escHtml(courseFullName(course, this.sharedNames))}</h2>
         <div class="uop-ind__yr-tabs" role="tablist">${tabs}</div>
         <div class="uop-ind__welcome">${texts.welcome}</div>
         <div class="uop-ind__accounts">${texts.accounts}</div>
@@ -597,7 +656,7 @@
             <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
           </ul>
         </div>
-        <p style="font-size:0.75rem;color:var(--ui-txtm);margin-top:12px;">Module ID: <code>${this.escHtml(yd ? yd.mod_code : '—')}</code> | Course code: ${this.escHtml(course.crs_code)}</p>
+        <p style="font-size:0.75rem;color:var(--ui-txtm);margin-top:12px;">Module ID${modCodes.length > 1 ? 's' : ''}: <code>${this.escHtml(modCodes.length ? modCodes.join(', ') : '—')}</code> | Course code: ${this.escHtml(course.crs_code)}</p>
       </div>`;
 
       this.$detailDiv.querySelectorAll('.uop-ind__yr-tab').forEach(btn => {

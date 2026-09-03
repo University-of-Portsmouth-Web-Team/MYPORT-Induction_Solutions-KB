@@ -92,6 +92,7 @@
   function loadData() {
     if (window.__COURSES_DATA__) {
       allCourses = window.__COURSES_DATA__.filter(c => Object.values(c.years).some(y => y.events.length > 0));
+      indexSharedNames(allCourses);
       filteredCourses = allCourses;
       initApp();
     } else {
@@ -150,7 +151,7 @@
 
   // ── Search & filter ────────────────────────────────────────
   function handleSearch() {
-    currentSearch = $searchInput.value.trim().toLowerCase();
+    currentSearch = normaliseForSearch($searchInput.value);
     applyFilters();
     // Fired after filtering so the result count is accurate. Already
     // debounced by the 300ms timer on the input listener, so this is
@@ -158,9 +159,27 @@
     track('trackSearch', currentSearch, filteredCourses.length);
   }
 
+  // Everything a search should be able to match: the display name, the other
+  // spellings the export used for this course, and the course code. Runs of
+  // punctuation collapse to a single space so that a missing space in the
+  // source data ("BSc (Hons)Psychological Sciences") still matches what a
+  // student would actually type.
+  function normaliseForSearch(value) {
+    return String(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function searchHaystack(course) {
+    if (!course.__haystack) {
+      const parts = [course.name]
+        .concat(course.name_variants || [], [course.crs_code || '']);
+      course.__haystack = normaliseForSearch(parts.join(' '));
+    }
+    return course.__haystack;
+  }
+
   function applyFilters() {
     filteredCourses = allCourses.filter(course => {
-      const matchesSearch = !currentSearch || course.name.toLowerCase().includes(currentSearch);
+      const matchesSearch = !currentSearch || searchHaystack(course).includes(currentSearch);
       const matchesFilter = currentFilter === 'all' || course.course_type === currentFilter;
       return matchesSearch && matchesFilter;
     });
@@ -270,9 +289,9 @@
       const count = y.events.length;
       const label = YEAR_LABELS[y.year] || `Year ${y.year}`;
       return `<button type="button" class="year-link" 
-        data-course="${escHtml(course.name)}" 
+        data-course-id="${escHtml(courseId(course))}" 
         data-year="${y.year}"
-        aria-label="View induction timetable for ${escHtml(course.name)}, ${label}">
+        aria-label="View induction timetable for ${escHtml(courseFullName(course))}, ${label}">
         ${escHtml(label)}
         ${count > 0 ? `<span class="event-count" aria-label="${count} session${count !== 1 ? 's' : ''}">${count}</span>` : ''}
       </button>`;
@@ -280,7 +299,9 @@
 
     li.innerHTML = `
       <div class="course-card-header">
-        <span class="course-name">${escHtml(course.name)}</span>
+        <span class="course-name">${escHtml(course.name)}${courseQualifier(course)
+          ? ` <span class="course-code-qualifier">(${escHtml(courseQualifier(course))})</span>`
+          : ''}</span>
         <span class="course-type-badge badge-${course.course_type}" aria-label="Course type: ${typeLabel}">${typeLabel}</span>
       </div>
       <div class="year-links">
@@ -290,9 +311,10 @@
     // Bind click
     li.querySelectorAll('.year-link').forEach(btn => {
       btn.addEventListener('click', () => {
-        const courseName = btn.dataset.course;
+        // Looked up by course code, not by name — several courses can share
+        // a name, and matching on it opened the wrong timetable (WD-1076).
+        const course = findCourseById(btn.dataset.courseId);
         const year = parseInt(btn.dataset.year, 10);
-        const course = allCourses.find(c => c.name === courseName);
         if (course) showDetail(course, year);
       });
     });
@@ -306,10 +328,10 @@
     currentYear = year;
 
     // Update URL (no reload)
-    const slug = slugify(course.name);
+    const slug = courseSlug(course);
     const yearStr = YEAR_LABELS[year] ? YEAR_LABELS[year].toLowerCase().replace(' ', '-') : `year-${year}`;
     const newHash = `#detail/${slug}/${yearStr}`;
-    history.pushState({ view: 'detail', courseName: course.name, year }, '', newHash);
+    history.pushState({ view: 'detail', courseId: courseId(course), year }, '', newHash);
 
     track('trackCourseView', course.name, yearLabelFor(year), {
       courseType: course.course_type,
@@ -325,11 +347,13 @@
     const yearData = course.years[year];
     const yearLabel = YEAR_LABELS[year] || `Year ${year}`;
 
-    // Heading
-    $detailCourseName.textContent = course.name;
+    // Heading — course code appended only where another course shares the
+    // name, so students on the full-time and part-time routes can tell which
+    // timetable they are looking at (WD-1076).
+    $detailCourseName.textContent = courseFullName(course);
 
     // Breadcrumb
-    $detailBreadcrumb.textContent = `${course.name} › ${yearLabel}`;
+    $detailBreadcrumb.textContent = `${courseFullName(course)} › ${yearLabel}`;
 
     // Year tabs
     $detailYearTabs.innerHTML = '';
@@ -351,12 +375,12 @@
         // replaceState (not pushState) so the back button still returns
         // to the listing rather than stepping through every year tab.
         try {
-          const slug = slugify(course.name);
+          const slug = courseSlug(course);
           const yearStr = YEAR_LABELS[y.year]
             ? YEAR_LABELS[y.year].toLowerCase().replace(' ', '-')
             : `year-${y.year}`;
           history.replaceState(
-            { view: 'detail', courseName: course.name, year: y.year },
+            { view: 'detail', courseId: courseId(course), year: y.year },
             '',
             `#detail/${slug}/${yearStr}`
           );
@@ -378,7 +402,10 @@
     $detailAccounts.innerHTML = texts.accounts;
 
     // Sidebar module info
-    const modCode = yearData ? yearData.mod_code : '—';
+    // A course-year can carry more than one induction module; all of them are
+    // listed rather than just the first (WD-1076).
+    const modCodes = yearData ? (yearData.mod_codes || [yearData.mod_code]) : [];
+    const modCode = modCodes.length ? modCodes.join(', ') : '—';
     $sidebarDl.innerHTML = `
       <dt>Course</dt><dd>${escHtml(course.name)}</dd>
       <dt>Year of study</dt><dd>${escHtml(yearLabel)}</dd>
@@ -389,7 +416,8 @@
     const fnote = document.createElement('p');
     fnote.id = 'detail-footnote';
     fnote.className = 'meta-note';
-    fnote.innerHTML = `Induction Module ID: <code>${escHtml(modCode)}</code> | Course code: ${escHtml(course.crs_code)}`;
+    fnote.innerHTML = `Induction Module ID${modCodes.length > 1 ? 's' : ''}: `
+      + `<code>${escHtml(modCode)}</code> | Course code: ${escHtml(course.crs_code)}`;
     $sidebarDl.insertAdjacentElement('afterend', fnote);
 
     // Timetable
@@ -489,7 +517,11 @@
     if (hash.startsWith('#detail/')) {
       const parts = hash.replace('#detail/', '').split('/');
       const slug = parts[0];
-      const course = allCourses.find(c => slugify(c.name) === slug);
+      // Match the stamped slug first. The name-derived fallback keeps links
+      // shared before WD-1076 working; where such a link is ambiguous it
+      // resolves to the first match, which is the page it used to open.
+      const course = allCourses.find(c => courseSlug(c) === slug)
+        || allCourses.find(c => slugify(c.name) === slug);
       if (course) {
         const yearStr = parts[1] || 'year-1';
         const year = yearFromStr(yearStr);
@@ -632,7 +664,54 @@
   }
 
   function slugify(str) {
-    return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return String(str).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // ── Course identity (WD-1076) ──────────────────────────────
+  // The address-bar slug used to be derived from the course name at render
+  // time, so two courses whose names differed only in case or punctuation
+  // produced the same slug and only one of them was ever reachable. The
+  // pipeline now stamps a unique `slug` and `id` (the course code) onto every
+  // course; both helpers fall back to the old behaviour so an older data.js
+  // still works.
+  function courseSlug(course) {
+    return course.slug || slugify(course.name);
+  }
+
+  function courseId(course) {
+    return course.id || course.crs_code || course.name;
+  }
+
+  function findCourseById(id) {
+    return allCourses.find(c => courseId(c) === id) || null;
+  }
+
+  // Course code, shown next to the name only when another course shares that
+  // name (typically the full-time and part-time routes of one degree, which
+  // the export spells identically).
+  let sharedDisplayNames = new Set();
+
+  // The course code is only worth showing when another course the student can
+  // actually see shares the name. A course whose twin has no timetabled
+  // sessions is hidden from the listing, so appending a code there would be
+  // noise rather than a disambiguator.
+  function indexSharedNames(courses) {
+    const counts = new Map();
+    for (const c of courses) {
+      const key = c.name.toLowerCase();
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    sharedDisplayNames = new Set([...counts].filter(([, n]) => n > 1).map(([k]) => k));
+  }
+
+  function courseQualifier(course) {
+    if (!course.name_qualifier) return '';
+    return sharedDisplayNames.has(course.name.toLowerCase()) ? course.name_qualifier : '';
+  }
+
+  function courseFullName(course) {
+    const q = courseQualifier(course);
+    return q ? `${course.name} (${q})` : course.name;
   }
 
   // ── Boot ───────────────────────────────────────────────────

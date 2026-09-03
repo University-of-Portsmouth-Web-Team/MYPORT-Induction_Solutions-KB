@@ -64,6 +64,15 @@ Replace `data.js` with a freshly generated file from updated spreadsheets. No ot
 - Unparseable or blank times sort last rather than jumping to the top of the day
 - No change to the shape of `data.js` — the fix reads the existing `time` field
 
+**v2.1 (2026-09-03)**
+- **Courses are identified by course code, not by name (WD-1076).** Reported as "false duplicate pages not showing". Lookups and the address-bar slug were both derived from the course name, so two courses whose names differed only in case or punctuation shared a slug and only the first was ever reachable — and courses that genuinely share a name (the full-time and part-time routes of one degree) opened whichever came first, which could be the wrong timetable
+- **Slug and id now come from the data.** `data.js` stamps a guaranteed-unique `slug` and an `id` (the course code) on every course. `courseSlug()` and `courseId()` use them, falling back to the old name-derived rule so an older `data.js` still works, and so links shared before this change still resolve
+- **Year buttons carry `data-course-id` instead of `data-course`**, so a click resolves by course code rather than by matching a name string
+- **All induction modules for a year are shown.** A course-year can carry more than one; the footnote now lists every `mod_codes[]` entry rather than just the first
+- **Course code shown beside the name** where two courses the student can actually see share a name (33 cases). Suppressed when the twin has no sessions and is therefore hidden, so it appears only where it genuinely disambiguates
+- "Recently viewed" entries store the course code alongside the name, so re-opening one cannot land on a same-named course
+- **Search widened and punctuation-normalised.** Matches the display name, the other spellings the export used (`name_variants[]`) and the course code. Punctuation collapses to spaces on both sides of the comparison, so `BSc (Hons)Psychological Sciences` — missing a space at source — is found by typing the name normally
+
 **v1.9 (2026-09-02)**
 - **Duplicate events suppressed.** `dedupeEvents()` filters by Induction Module ID + Event ID before the timetable is grouped by date
 - **Room/building pairs listed one per line.** `locHtml()` now reads the paired `locations[]` array and renders a `<ul class="loc-list">`, one `room, building` pair per line, with an `aria-label` giving the room count. Multi-room bookings no longer drop room numbers or repeat the building name

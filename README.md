@@ -184,6 +184,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v2.1 | 2026-09-03 | **Course identity fixed — WD-1076.** A course is now identified by its **course code**, not by its name. Keying on the name split one course across several cards where the export spelled it inconsistently (`BA (Hons)` vs `BA (hons)`), and merged genuinely different courses that share a name (the full-time and part-time routes of one degree). Each course-year now keeps **all** its induction modules instead of only the last one read, and the pipeline stamps a guaranteed-unique `slug` that the renderers use instead of deriving one from the name at render time. Restores **25 courses** and **150 events** that were unreachable; eliminates all 12 colliding URLs |
 | v2.0 | 2026-09-03 | **GA4 analytics on Solution 1 (INS-873).** Engagement is now measured with custom events rather than page views, because GA4 strips the `#` fragment the app routes on. New `course_view` event carries `course_name`, `year`, `course_type` and `entry_method`; supporting `course_search`, `alpha_index_click` and `course_filter` events answer whether students prefer keyword search or the A–Z index. Tracking lives in a new self-contained `solution1/analytics.js` and degrades silently if the Google tag is blocked. Also fixes the detail-view year tabs, which previously left the URL pointing at the year the user arrived on |
 | v1.9 | 2026-09-02 | **Data-quality workarounds for the 2026/27 export.** Duplicate event rows suppressed by Induction Module ID + Event ID (10,077 → 3,206 rows). Transposed `Site`/`Room` columns un-swapped and their parallel lists zipped into room + building pairs, listed one per line — multi-room bookings no longer lose rooms or repeat the building. URLs in `Details` extracted into their own field, delimiters stripped, and rendered as a hyperlink on a new line |
 | v1.8 | 2026-08-27 | **Solution 1** stripped of site header, breadcrumb, page hero and footer — page now opens on the search bar; visually hidden `<h1>` retained for accessibility. **All solutions:** four broken MyPort links corrected (IT Support, International, Campus maps, Library) |
@@ -198,7 +199,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 ---
 
-## Data-quality workarounds (v1.9)
+## Data-quality workarounds (v1.9, extended in v2.1)
 
 The 2026/27 timetable export (`data/ind_tt_20260902.xlsx`) arrived with several
 faults that are not present in the requirement and cannot be fixed upstream in
@@ -281,6 +282,77 @@ Handled on extraction:
 
 **358 events** now carry a working link.
 
+### 5. Course identity: the name is not a key (WD-1076)
+
+Reported as "false duplicate pages not showing". The report was right that
+pages were unreachable, but the duplicates were not duplicates — and the
+underlying fault was wider than the twelve rows listed.
+
+The pipeline used to key its course dictionary on the `Crs Name` string, and
+the renderers built the address-bar slug by lower-casing that same name at
+render time. Because the name carried the identity, two opposite failures
+happened at once.
+
+**One real course split into several cards.** `BA (Hons) Fashion and Textile
+Design` and `BA (hons) Fashion and Textile Design` are both course `U2437PYC`,
+but a single lower-case *h* made them separate entries. Both slugified to
+`ba-hons-fashion-and-textile-design`, so the router's `find()` returned
+whichever came first and the other was unreachable. Eight of the twelve
+reported rows are this.
+
+**Several real courses collapsed into one card.** 53 course names in the
+export are shared by two or three *different* course codes — almost all
+full-time versus part-time routes (`MSc Civil Engineering` is both `P3388FTC`
+and `P3388PTC`). Those merged into a single card, and since `years[year]`
+held only one module, one route's induction silently overwrote the other's.
+This is the more serious of the two: it did not hide a page, it showed
+students **the wrong timetable**.
+
+Courses are now keyed on `Crs Code`. One canonical display name is chosen per
+code from the spellings the export actually used — visibly malformed ones
+lose (a trailing `Year 1`, a doubled final word), then the most frequent wins,
+then the longest. So `BA (Hons)` beats a one-off `BA (hons)`, and
+`(Full Time)` is kept in preference to the bare name. The rejected spellings
+survive in `name_variants[]` and remain searchable.
+
+| | Before | After |
+|---|---|---|
+| Cards in the listing | 734 | **668** (one per course code) |
+| Colliding URL slugs | 12 | **0** |
+| Courses visible in search | 387 | **412** |
+| Events reachable | 2,998 | **3,148** |
+| Induction modules never reachable | 251 | **0** |
+
+### 6. More than one induction module per course-year (WD-1076)
+
+`years[year]` held a single module, so where a course-year had more than one
+the later row overwrote the earlier one. **251 modules** were unreachable this
+way, 80 of which had timetabled sessions — **212 event rows silently dropped**.
+
+Each year now carries a `modules[]` list and `mod_codes[]`, and the union of
+their events de-duplicated on `Event Id`. The scalar `mod_code` is still
+emitted so an older renderer keeps working. 263 course-years are affected.
+
+### 7. Guaranteed-unique slugs (WD-1076)
+
+The pipeline now stamps an explicit `slug` and `id` (the course code) on every
+course, and all three renderers use them instead of re-deriving a slug from the
+name. Where two courses would still produce the same slug, the resolver first
+looks for another spelling of one of them that the export already provides —
+this is what separated `BEng (Hons) Civil Engineering DA` (`U3802PDC`) from
+`BEng (Hons) Civil Engineering (Degree Apprenticeship)` (`U2896PDC`) with no
+hand-coding. Failing that, the course code is appended, so a link can never
+resolve to the wrong course.
+
+Links shared before this change still work: the router matches the stamped
+slug first and falls back to the old name-derived rule.
+
+Where two courses the student can actually see still share a display name
+(**33 cases**, almost all full-time/part-time pairs), the course code is shown
+beside the name so they can tell which is which. It is deliberately *not*
+shown when the twin has no timetabled sessions and is therefore hidden, since
+that would be noise rather than a disambiguator.
+
 ### Known faults left alone deliberately
 
 | Fault | Why | Action |
@@ -289,6 +361,9 @@ Handled on extraction:
 | One `https://student-system` with no TLD | Same — cannot resolve | Left as plain text |
 | Mojibake in at least one description (`KarenÂ¿s recent research`) | Character-encoding fault at source; guessing the intended character risks corrupting other rows | **Raise with the timetabling team** |
 | Descriptions truncated mid-word (`…get the most out of librar`) | Field-length limit at source | **Raise with the timetabling team** |
+| 33 pairs of courses share a name with no distinguishing wording, e.g. `MSc Civil Engineering` for both `P3388FTC` and `P3388PTC` | The code suffixes correlate with study mode but not cleanly enough to derive a "Full Time"/"Part Time" label safely — `PYC` and `FTC` both appear on full-time courses. Inventing a label risks labelling a timetable wrongly | Course code shown beside the name. **Raise with the timetabling team** — a proper mode field, or distinct names, would let us drop the codes |
+| `BSc (Hons)Psychological Sciences` (`U3518PYC`) is missing a space after `(Hons)` | It is the only spelling the export gives for that code, and silently correcting course names risks changing one that is deliberate | Search normalises punctuation so students still find it by typing the name normally. **Raise with the timetabling team** |
+| `BA (Hons) Fashion and Textile Design` (`U2437PYC`) has no timetabled sessions on any of its three modules | Not an app fault — `I00010`, `I01121` and `I01122` do not appear in the timetable export at all. Courses with no events are hidden by design (v1.2) | **Raise with the School** — the course stays hidden until sessions are timetabled |
 
 ---
 

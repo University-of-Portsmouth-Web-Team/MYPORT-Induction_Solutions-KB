@@ -105,6 +105,15 @@ No personal data is collected — only course names, years and search terms. `se
 
 ## Changelog
 
+**v2.1 (2026-09-03)**
+- **Courses are identified by course code, not by name (WD-1076).** Reported as "false duplicate pages not showing". Lookups and the address-bar slug were both derived from the course name, so two courses whose names differed only in case or punctuation shared a slug and only the first was ever reachable — and courses that genuinely share a name (the full-time and part-time routes of one degree) opened whichever came first, which could be the wrong timetable
+- **Slug and id now come from the data.** `data.js` stamps a guaranteed-unique `slug` and an `id` (the course code) on every course. `courseSlug()` and `courseId()` use them, falling back to the old name-derived rule so an older `data.js` still works, and so links shared before this change still resolve
+- **Year buttons carry `data-course-id` instead of `data-course`**, so a click resolves by course code rather than by matching a name string
+- **All induction modules for a year are shown.** A course-year can carry more than one; the footnote now lists every `mod_codes[]` entry rather than just the first
+- **Course code shown beside the name** where two courses the student can actually see share a name (33 cases). Suppressed when the twin has no sessions and is therefore hidden, so it appears only where it genuinely disambiguates
+- Detail heading, breadcrumb and card `aria-label`s use the qualified name, so a screen reader announces which of two same-named courses is open
+- **Search widened and punctuation-normalised.** Matches the display name, the other spellings the export used (`name_variants[]`) and the course code. Punctuation collapses to spaces on both sides of the comparison, so `BSc (Hons)Psychological Sciences` — missing a space at source — is found by typing the name normally
+
 **v2.0 (2026-09-03)**
 - **GA4 analytics added (INS-873).** Google tag `G-BVP9PTRZJL` ("Induction Timetables" data stream on the MyPort property) added to `index.html`, with all tracking logic in a new self-contained `analytics.js`
 - **`course_view` custom event** fires whenever a timetable is opened, carrying `course_name`, `year`, `course_type` and `entry_method`. This replaces the page-view approach, which could not work: GA4's page-path dimensions strip everything after the `#`, so all screens would have collapsed into a single row for `/solution1/`

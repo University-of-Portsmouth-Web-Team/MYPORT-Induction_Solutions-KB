@@ -333,6 +333,15 @@ h3 { font-size: 1.125rem; }
   flex: 1;
   min-width: 0;
 }
+/* Course code shown beside the name only where two courses share a name
+   (WD-1076). #505457 on the card background clears WCAG 2.2 AA at this size. */
+.course-code-qualifier {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
 .course-type-badge {
   font-family: var(--font-sans);
   font-size: 0.75rem;

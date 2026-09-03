@@ -46,6 +46,33 @@ Output:
    session title).  URLs are now stripped out of the text — delimiters and
    dangling "Meeting link:" labels included — and emitted as `links[]` for
    the renderers to show on their own line.
+
+5. Course identity is the course CODE, not the course NAME  (WD-1076)
+   The modules export spells the same course several different ways —
+   "BA (Hons) Fashion and Textile Design" vs "BA (hons) Fashion and Textile
+   Design", "MSc Engineering Management (Full Time)" vs "MSc Engineering
+   Management".  Courses used to be keyed on the raw name string, which
+   caused two opposite failures at once:
+     • one real course split into several cards, and
+     • several real courses (e.g. the full-time and part-time routes, which
+       share a name but not a code) collapsed into a single card.
+   Courses are now keyed on `Crs Code`.  One canonical display name is
+   chosen per code from the observed spellings; the rest are kept in
+   `name_variants[]` so search still matches what the School typed.
+
+6. Several induction modules per course-year  (WD-1076)
+   `years[year]` used to hold a single module, so where a course-year had
+   more than one induction module the later row silently overwrote the
+   earlier one.  Each year now carries a `modules[]` list and the union of
+   their events, de-duplicated on Event Id.
+
+7. Colliding URL slugs  (WD-1076)
+   The renderers built the address-bar slug by lower-casing the course name,
+   so two courses whose names differed only in case or punctuation produced
+   the same slug and only the first was ever reachable.  The pipeline now
+   emits an explicit, guaranteed-unique `slug` per course — disambiguated
+   with the course code where two courses genuinely share a name — and the
+   renderers use that instead of re-deriving one.
 """
 
 import argparse
@@ -309,6 +336,124 @@ def locations_are_online(locations: list[dict]) -> bool:
     )
 
 
+# ── Course identity, canonical naming and slugs (WD-1076) ─────────────────
+def slugify(value: str) -> str:
+    """Lower-case, hyphen-separated slug — identical rule to the renderers."""
+    s = re.sub(r"[^a-z0-9]+", "-", str(value).lower())
+    return s.strip("-")
+
+
+# A trailing "Year 1" is an artefact of the export, not part of the course
+# name.  So is a doubled final word ("... (11-16 Years) Years)").
+_NAME_YEAR_TAIL = re.compile(r"\s+Year\s*\d+\s*$", re.IGNORECASE)
+
+
+def name_is_malformed(name: str) -> bool:
+    """True for spellings that are visibly damaged rather than merely different."""
+    if _NAME_YEAR_TAIL.search(name):
+        return True
+    tokens = name.split()
+    if len(tokens) >= 2 and tokens[-1] == tokens[-2]:
+        return True
+    return False
+
+
+def _name_rank(name: str, count: int) -> tuple:
+    """Sort key that puts the best spelling of a course name first.
+
+    Deliberately boring and deterministic, in this order:
+      1. visibly malformed spellings lose;
+      2. the spelling the export uses most often wins — a one-off
+         "BA (hons)" cannot outvote the "BA (Hons)" used on every other row;
+      3. the longer spelling wins, because the extra text is nearly always a
+         real qualifier such as "(Full Time)" or "(Distance Learning)";
+      4. alphabetical, so the same input always yields the same output.
+    """
+    return (name_is_malformed(name), -count, -len(name), name)
+
+
+def choose_display_names(variants_by_code: dict[str, dict[str, int]]) -> dict[str, list[str]]:
+    """Order each course code's observed spellings, best first.
+
+    Returns {course code: [canonical name, ...other spellings]}.  The tail is
+    kept so the renderers can still match a search against whatever wording a
+    student was given by their School.
+    """
+    ordered: dict[str, list[str]] = {}
+    for code, counts in variants_by_code.items():
+        ordered[code] = [n for n, _ in sorted(counts.items(),
+                                              key=lambda kv: _name_rank(kv[0], kv[1]))]
+    return ordered
+
+
+def resolve_names_and_slugs(ordered_names: dict[str, list[str]]) -> dict[str, dict]:
+    """Give every course code a display name and a slug that is unique.
+
+    Two different courses can legitimately arrive with the same name — the
+    full-time and part-time routes of one degree share a name but not a code.
+    Where a name is shared:
+      1. try a different observed spelling that is not already taken (this is
+         what separates "MSc Engineering Management (Full Time)" from the bare
+         "MSc Engineering Management");
+      2. if the export offers nothing to tell them apart, keep the shared name
+         and set `qualifier` to the course code, so the listing can show
+         students which is which rather than hiding one of them.
+    The slug falls back to the course code, so a link can never resolve to the
+    wrong course.
+    """
+    # Deterministic processing order: by best name, then code.
+    codes = sorted(ordered_names, key=lambda c: (ordered_names[c][0].upper(), c))
+
+    slug_owner: dict[str, str] = {}
+    resolved: dict[str, dict] = {}
+
+    for code in codes:
+        variants = ordered_names[code]
+        chosen = variants[0]
+        # Prefer a spelling whose slug nobody has claimed yet.
+        for candidate in variants:
+            if slugify(candidate) not in slug_owner:
+                chosen = candidate
+                break
+        slug = slugify(chosen) or slugify(code)
+        if slug in slug_owner:
+            slug = f"{slug}-{code.lower()}"
+        slug_owner[slug] = code
+        resolved[code] = {"name": chosen, "slug": slug, "variants": variants}
+
+    # Flag courses that still share a display name, so the UI can show the
+    # course code alongside it instead of hiding one of them.
+    by_name: dict[str, list[str]] = {}
+    for code, info in resolved.items():
+        by_name.setdefault(info["name"].casefold(), []).append(code)
+    for shared in by_name.values():
+        if len(shared) > 1:
+            for code in shared:
+                resolved[code]["qualifier"] = code
+
+    return resolved
+
+
+def merge_events(event_lists: list[list[dict]]) -> list[dict]:
+    """Union of several modules' events, de-duplicated on Event Id.
+
+    Where a course-year has more than one induction module the modules often
+    share sessions.  Keying on Event Id keeps one copy of each session while
+    still picking up anything only one of the modules carries.
+    """
+    merged: list[dict] = []
+    seen: set[int] = set()
+    for events in event_lists:
+        for ev in events:
+            if ev["event_id"] in seen:
+                continue
+            seen.add(ev["event_id"])
+            merged.append(ev)
+    merged.sort(key=lambda x: (x["date_sort"], time_to_minutes(x["time"]),
+                               time_to_minutes(x.get("finish")), x.get("title") or ""))
+    return merged
+
+
 # ── Core data builder ─────────────────────────────────────────────────────────
 
 def build_courses(modules_path: str, events_path: str) -> list[dict]:
@@ -422,33 +567,90 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
                            time_to_minutes(x.get("finish")), x.get("title") or "")
         )
 
-    # Assemble per-course structure
-    courses_data: dict[str, dict] = {}
+    # ── Workaround 5: key courses on the course CODE, not the name ────────
+    # First pass — collect every spelling of every course code, and every
+    # induction module attached to each (code, year).
+    name_counts: dict[str, dict[str, int]] = {}
+    modules_by_course_year: dict[str, dict[int, list[str]]] = {}
+    course_type_by_code: dict[str, str] = {}
+
     for _, mod_row in df_modules.iterrows():
         crs_name = str(mod_row["Crs Name"]).strip()
+        crs_code = str(mod_row["Crs Code"]).strip()
         if not crs_name or crs_name == "nan":
             continue
+        if not crs_code or crs_code == "nan":
+            continue
 
-        if crs_name not in courses_data:
-            courses_data[crs_name] = {
-                "name":        crs_name,
-                "crs_code":    str(mod_row["Crs Code"]).strip(),
-                "course_type": mod_row["course_type"],
-                "years":       {},
-            }
+        name_counts.setdefault(crs_code, {})
+        name_counts[crs_code][crs_name] = name_counts[crs_code].get(crs_name, 0) + 1
+        course_type_by_code.setdefault(crs_code, mod_row["course_type"])
 
         year     = int(mod_row["Course Year"])
         mod_code = str(mod_row["Mod Code"]).strip()
-        events   = events_by_mod.get(mod_code, [])
+        year_map = modules_by_course_year.setdefault(crs_code, {})
+        mods     = year_map.setdefault(year, [])
+        if mod_code not in mods:            # ── Workaround 6: keep them all
+            mods.append(mod_code)
 
-        courses_data[crs_name]["years"][year] = {
-            "year":     year,
-            "mod_code": mod_code,
-            "events":   events,
+    # ── Workaround 7: one canonical name and one unique slug per course ────
+    resolved = resolve_names_and_slugs(choose_display_names(name_counts))
+
+    courses_data: dict[str, dict] = {}
+    multi_module_years = 0
+
+    for crs_code, year_map in modules_by_course_year.items():
+        info = resolved[crs_code]
+
+        years: dict[int, dict] = {}
+        for year in sorted(year_map):
+            mod_codes = year_map[year]
+            if len(mod_codes) > 1:
+                multi_module_years += 1
+
+            modules = [{"mod_code": m, "events": events_by_mod.get(m, [])}
+                       for m in mod_codes]
+            events = merge_events([m["events"] for m in modules])
+
+            years[year] = {
+                "year":      year,
+                # `mod_code` kept as a scalar for older renderers; `mod_codes`
+                # is the full list and is what the UI should show.
+                "mod_code":  mod_codes[0],
+                "mod_codes": mod_codes,
+                "events":    events,
+            }
+
+        course = {
+            "id":          crs_code,
+            "slug":        info["slug"],
+            "name":        info["name"],
+            "crs_code":    crs_code,
+            "course_type": course_type_by_code.get(crs_code, "Other"),
+            "years":       years,
         }
+        # Other spellings the export used for this course — searchable, so a
+        # student who was given the School's wording still finds the course.
+        other_names = [n for n in info["variants"] if n != info["name"]]
+        if other_names:
+            course["name_variants"] = other_names
+        # Set only when another course genuinely shares this display name.
+        if info.get("qualifier"):
+            course["name_qualifier"] = info["qualifier"]
+
+        courses_data[crs_code] = course
 
     # Sort alphabetically by course name, return as list
-    courses_list = sorted(courses_data.values(), key=lambda x: x["name"].upper())
+    courses_list = sorted(courses_data.values(),
+                          key=lambda x: (x["name"].upper(), x["crs_code"]))
+
+    shared_name_courses = sum(1 for c in courses_list if c.get("name_qualifier"))
+    print(f"  Course codes:          {len(courses_list)}  "
+          f"(one card per course code, not per spelling)")
+    print(f"  Course-years with >1 induction module: {multi_module_years}  "
+          f"(all modules kept, events merged)")
+    print(f"  Courses sharing a display name:        {shared_name_courses}  "
+          f"(course code shown alongside to tell them apart)")
 
     # Summary
     total_events   = sum(len(y["events"]) for c in courses_list for y in c["years"].values())

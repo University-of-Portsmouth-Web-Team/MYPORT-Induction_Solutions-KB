@@ -43,6 +43,7 @@
       return;
     }
     all = data.filter(c => Object.values(c.years).some(y => y.events.length > 0));
+    indexSharedNames(all);
     filtered = data;
     applyFilters();
 
@@ -116,7 +117,10 @@
       const parts = hash.replace('#detail/', '').split('/');
       const slug = parts[0];
       const year = parseInt(parts[1] || '1', 10);
-      const course = all.find(c => slugify(c.name) === slug);
+      // Stamped slug first; the name-derived fallback keeps links shared
+      // before WD-1076 working.
+      const course = all.find(c => courseSlug(c) === slug)
+        || all.find(c => slugify(c.name) === slug);
       if (course) {
         renderDetail(course, course.years[year] ? year : parseInt(Object.keys(course.years)[0], 10));
         showPanel('detail');
@@ -130,13 +134,13 @@
 
   // ── Search & filter ───────────────────────────────────────
   function doSearch() {
-    searchVal = $search.value.trim().toLowerCase();
+    searchVal = normaliseForSearch($search.value);
     applyFilters();
   }
 
   function applyFilters() {
     filtered = all.filter(c => {
-      const ms = !searchVal || c.name.toLowerCase().includes(searchVal);
+      const ms = !searchVal || searchHaystack(c).includes(searchVal);
       const mf = activeFilter === 'all' || c.course_type === activeFilter;
       return ms && mf;
     });
@@ -186,15 +190,16 @@
           const cnt = y.events.length;
           const lbl = YEAR_LABELS[y.year] || 'Year ' + y.year;
           return `<button type="button" class="yr-btn" 
-            data-name="${esc(c.name)}" data-year="${y.year}"
-            aria-label="${esc(c.name)}, ${lbl}${cnt ? ', ' + cnt + ' session' + (cnt !== 1 ? 's' : '') : ''}">
+            data-course-id="${esc(courseId(c))}" data-year="${y.year}"
+            aria-label="${esc(courseFullName(c))}, ${lbl}${cnt ? ', ' + cnt + ' session' + (cnt !== 1 ? 's' : '') : ''}">
             ${esc(lbl)}
             ${cnt ? `<span class="ev-badge" aria-hidden="true">${cnt}</span>` : ''}
           </button>`;
         }).join('');
         html += `<li class="course-card">
           <div class="course-card-top">
-            <span class="course-card-name">${esc(c.name)}</span>
+            <span class="course-card-name">${esc(c.name)}${courseQualifier(c)
+              ? ` <span class="course-code-qualifier">(${esc(courseQualifier(c))})</span>` : ''}</span>
             <span class="type-pill pill-${c.course_type}" aria-label="${typeLabel}">${typeLabel}</span>
           </div>
           <div class="year-strip">${yBtns || '<span style="font-size:.8125rem;color:#888;font-style:italic">No sessions yet</span>'}</div>
@@ -205,14 +210,14 @@
     $output.innerHTML = html;
     $output.querySelectorAll('.yr-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const course = all.find(c => c.name === btn.dataset.name);
+        const course = findCourseById(btn.dataset.courseId);
         if (course) {
           const year = parseInt(btn.dataset.year, 10);
           addRecent(course, year);
           renderDetail(course, year);
           showPanel('detail');
           activateSidebarBtn('search');
-          history.pushState({}, '', '#detail/' + slugify(course.name) + '/' + year);
+          history.pushState({}, '', '#detail/' + courseSlug(course) + '/' + year);
         }
       });
     });
@@ -221,6 +226,8 @@
   // ── Detail rendering ──────────────────────────────────────
   function renderDetail(course, year) {
     const yd = course.years[year];
+    // A course-year can carry more than one induction module (WD-1076).
+    const modCodes = yd ? (yd.mod_codes || [yd.mod_code]).filter(Boolean) : [];
     const yl = YEAR_LABELS[year] || 'Year ' + year;
     const sortedYears = Object.values(course.years).sort((a, b) => a.year - b.year);
     const tabs = sortedYears.map(y => {
@@ -268,7 +275,7 @@
     }
 
     $detailContent.innerHTML = `
-      <h1 tabindex="-1">${esc(course.name)}</h1>
+      <h1 tabindex="-1">${esc(courseFullName(course))}</h1>
       <div class="year-tab-strip" role="tablist" aria-label="Year of study">${tabs}</div>
       <div class="welcome-block">${texts.welcome}</div>
       <div class="accounts-block">${texts.accounts}</div>
@@ -292,7 +299,7 @@
           <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
         </ul>
       </div>
-      <p class="meta-note">Induction Module ID: <code>${esc(yd ? yd.mod_code : '—')}</code> | Course code: ${esc(course.crs_code)}</p>
+      <p class="meta-note">Induction Module ID${modCodes.length > 1 ? 's' : ''}: <code>${esc(modCodes.length ? modCodes.join(', ') : '—')}</code> | Course code: ${esc(course.crs_code)}</p>
     `;
 
     $detailContent.querySelector('h1').focus();
@@ -302,7 +309,7 @@
         const yr = parseInt(tab.dataset.year, 10);
         addRecent(course, yr);
         renderDetail(course, yr);
-        history.replaceState({}, '', '#detail/' + slugify(course.name) + '/' + yr);
+        history.replaceState({}, '', '#detail/' + courseSlug(course) + '/' + yr);
       });
     });
   }
@@ -341,8 +348,10 @@
 
   // ── Recent courses ────────────────────────────────────────
   function addRecent(course, year) {
-    recentCourses = recentCourses.filter(r => !(r.name === course.name && r.year === year));
-    recentCourses.unshift({ name: course.name, year, type: course.course_type, modCode: course.years[year]?.mod_code });
+    const id = courseId(course);
+    recentCourses = recentCourses.filter(r => !((r.id || r.name) === id && r.year === year));
+    recentCourses.unshift({ id, name: courseFullName(course), year, type: course.course_type,
+                            modCode: (course.years[year]?.mod_codes || [course.years[year]?.mod_code]).filter(Boolean).join(', ') });
     if (recentCourses.length > 8) recentCourses = recentCourses.slice(0, 8);
     try { sessionStorage.setItem('uop_recent', JSON.stringify(recentCourses)); } catch (e) {}
   }
@@ -357,7 +366,7 @@
       const lbl = YEAR_LABELS[r.year] || 'Year ' + r.year;
       const typeLabel = r.type === 'UG' ? 'Undergraduate' : r.type === 'PGT' ? 'Postgraduate' : 'Other';
       html += `<li class="recent-item" role="button" tabindex="0"
-        data-name="${esc(r.name)}" data-year="${r.year}"
+        data-course-id="${esc(r.id || r.name)}" data-year="${r.year}"
         aria-label="${esc(r.name)}, ${lbl}">
         <div class="recent-item-name">${esc(r.name)}</div>
         <div class="recent-item-meta">${esc(lbl)} · ${typeLabel}</div>
@@ -367,13 +376,14 @@
     $recentContent.innerHTML = html;
     $recentContent.querySelectorAll('.recent-item').forEach(item => {
       const go = () => {
-        const course = all.find(c => c.name === item.dataset.name);
+        const course = findCourseById(item.dataset.courseId)
+          || all.find(c => c.name === item.dataset.courseId);
         if (course) {
           const year = parseInt(item.dataset.year, 10);
           renderDetail(course, year);
           showPanel('detail');
           activateSidebarBtn('search');
-          history.pushState({}, '', '#detail/' + slugify(course.name) + '/' + year);
+          history.pushState({}, '', '#detail/' + courseSlug(course) + '/' + year);
         }
       };
       item.addEventListener('click', go);
@@ -483,7 +493,54 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
   function slugify(s) {
-    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  // ── Course identity (WD-1076) ──────────────────────────────────
+  // Slugs and lookups used to be derived from the course name, so courses
+  // whose names differed only in case or punctuation shared a slug and only
+  // one was reachable. The pipeline now stamps a unique `slug` and `id`;
+  // both helpers fall back to the old behaviour for an older data.js.
+  function courseSlug(c) { return c.slug || slugify(c.name); }
+  function courseId(c)   { return c.id || c.crs_code || c.name; }
+  function findCourseById(id) { return all.find(c => courseId(c) === id) || null; }
+  let sharedDisplayNames = new Set();
+
+  // The course code is only worth showing when another course the student can
+  // actually see shares the name. A course whose twin has no timetabled
+  // sessions is hidden from the listing, so appending a code there would be
+  // noise rather than a disambiguator.
+  function indexSharedNames(courses) {
+    const counts = new Map();
+    for (const c of courses) {
+      const k = c.name.toLowerCase();
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    sharedDisplayNames = new Set([...counts].filter(([, n]) => n > 1).map(([k]) => k));
+  }
+
+  function courseQualifier(c) {
+    if (!c.name_qualifier) return '';
+    return sharedDisplayNames.has(c.name.toLowerCase()) ? c.name_qualifier : '';
+  }
+  function courseFullName(c) {
+    const q = courseQualifier(c);
+    return q ? c.name + ' (' + q + ')' : c.name;
+  }
+
+  function normaliseForSearch(v) {
+    return String(v).toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // Display name, the other spellings the export used, and the course code —
+  // punctuation flattened so a missing space in the source data still matches
+  // what a student would type.
+  function searchHaystack(c) {
+    if (!c.__haystack) {
+      c.__haystack = normaliseForSearch(
+        [c.name].concat(c.name_variants || [], [c.crs_code || '']).join(' '));
+    }
+    return c.__haystack;
   }
 
   // ── Start ─────────────────────────────────────────────────
