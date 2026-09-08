@@ -184,6 +184,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v2.2 | 2026-09-08 | **Two data faults fixed — TECH-610 and TECH-609.** Non-induction `M` module codes are now dropped on read from both the modules workbook and the timetable export (6,232 event rows); an induction is always an `I` code. Room numbers stored as decimals no longer lose a trailing zero — `3.30` was rendering as `3.3`, a room that does not exist, across 169 event locations and 11 distinct rooms. Both fixes are in the pipeline, so a future export carrying the same faults cannot reintroduce them; both are guarded by new assertions in `scripts/smoke-test.js`. Refreshed `data/Induction_Modules_September_2026.xlsx` with the `M` rows removed at source. Three course codes whose only module was an `M` code no longer appear — see workaround 8. No renderer changed |
 | v2.1 | 2026-09-03 | **Course identity fixed — WD-1076.** A course is now identified by its **course code**, not by its name. Keying on the name split one course across several cards where the export spelled it inconsistently (`BA (Hons)` vs `BA (hons)`), and merged genuinely different courses that share a name (the full-time and part-time routes of one degree). Each course-year now keeps **all** its induction modules instead of only the last one read, and the pipeline stamps a guaranteed-unique `slug` that the renderers use instead of deriving one from the name at render time. Restores **25 courses** and **150 events** that were unreachable; eliminates all 12 colliding URLs |
 | v2.0 | 2026-09-03 | **GA4 analytics on Solution 1 (INS-873).** Engagement is now measured with custom events rather than page views, because GA4 strips the `#` fragment the app routes on. New `course_view` event carries `course_name`, `year`, `course_type` and `entry_method`; supporting `course_search`, `alpha_index_click` and `course_filter` events answer whether students prefer keyword search or the A–Z index. Tracking lives in a new self-contained `solution1/analytics.js` and degrades silently if the Google tag is blocked. Also fixes the detail-view year tabs, which previously left the URL pointing at the year the user arrived on |
 | v1.9 | 2026-09-02 | **Data-quality workarounds for the 2026/27 export.** Duplicate event rows suppressed by Induction Module ID + Event ID (10,077 → 3,206 rows). Transposed `Site`/`Room` columns un-swapped and their parallel lists zipped into room + building pairs, listed one per line — multi-room bookings no longer lose rooms or repeat the building. URLs in `Details` extracted into their own field, delimiters stripped, and rendered as a hyperlink on a new line |
@@ -199,7 +200,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 ---
 
-## Data-quality workarounds (v1.9, extended in v2.1)
+## Data-quality workarounds (v1.9, extended in v2.1, TECH-609 and TECH-610)
 
 The 2026/27 timetable export (`data/ind_tt_20260902.xlsx`) arrived with several
 faults that are not present in the requirement and cannot be fixed upstream in
@@ -352,6 +353,64 @@ Where two courses the student can actually see still share a display name
 beside the name so they can tell which is which. It is deliberately *not*
 shown when the twin has no timetabled sessions and is therefore hidden, since
 that would be noise rather than a disambiguator.
+
+### 8. Non-induction `M` module codes (TECH-610)
+
+The modules workbook and the timetable export both carry module codes
+beginning with `M`. These are **taught modules** that hang off the same course
+descriptors as the induction — they are not induction sessions, and they have
+no business on an induction page. An induction is always an `I` code.
+
+Every row carrying an `M` code is now dropped on read, from both files. The
+modules workbook is what decides which codes reach a course page, so filtering
+it is what fixes the page; filtering the timetable export as well keeps the two
+consistent and avoids carrying **6,232 rows** that can no longer attach to
+anything.
+
+Applying the rule in the pipeline rather than only in the spreadsheet means a
+future export that still contains `M` codes cannot put them back on the site.
+Anything starting with neither `I` nor `M` is kept and reported on the console,
+so an unexpected code is visible rather than silently dropped.
+
+**One consequence worth a decision:** three course codes listed *no* induction
+module other than an `M` code, so they now have no card at all.
+
+| Course code | Course | Sessions lost |
+|---|---|---|
+| `C3138FTC` | BSc (Hons) Sport, Health and Exercise Sciences (Full Time) | 39 |
+| `U3826PYC` | BA (Hons) Early Childhood Studies with Foundation Year (Full Time) | 1 |
+| `U4118FTC` | BSc (Hons)) Professional Policing with Foundation Year (Full Time) | 1 |
+
+The two Foundation Year courses have a sibling course code that is unaffected
+(`U2143PYC` and `U3198PYC`), so a student searching the course name still finds
+a timetable. `C3138FTC` has no equivalent — it is the only Sport, Health and
+Exercise Sciences code in the export, and it now shows nothing. That looks like
+a missing `I`-coded induction module at source rather than something the
+pipeline should paper over.
+
+### 9. Room numbers losing a trailing zero (TECH-609)
+
+Rooms that read like decimals — `3.30`, `1.10`, `2.20` — are stored in the
+spreadsheet as **numbers**, not text. The number `3.30` and the number `3.3`
+are the same number, so the trailing zero is not in the file at all and any
+room ending in a zero after the point was silently wrong on the page:
+`Burnaby Building 3.3`, a room that does not exist.
+
+Worth recording that the obvious one-line fix does not work here. Passing
+`dtype={"Site": str, "Room": str}` to `read_excel` changes nothing, because
+openpyxl has already parsed the cell to a float by the time pandas applies the
+cast — casting `3.3` to text gives `"3.3"` again. The zero has to be restored
+on the way out instead.
+
+Every room number that the export happens to store as *text* uses exactly two
+digits after the point, without a single exception across the file (83 of 83).
+Numeric room cells are therefore rendered to two decimal places. A number
+carrying more precision than that convention allows is left exactly as it
+arrived rather than rounded, so anything unexpected stays visible instead of
+being quietly turned into a different room.
+
+**11 room numbers** were affected, across **169 event locations**: `0.10`,
+`0.20`, `0.30`, `1.10`, `1.30`, `2.10`, `2.20`, `2.30`, `3.10`, `3.20`, `3.30`.
 
 ### Known faults left alone deliberately
 

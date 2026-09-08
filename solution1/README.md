@@ -105,6 +105,12 @@ No personal data is collected — only course names, years and search terms. `se
 
 ## Changelog
 
+**v2.2 (2026-09-08)**
+- **Data fix only — no change to `index.html`, `app.js`, `styles.css` or `analytics.js`.** Both fixes are in the shared pipeline; this solution picks them up through a regenerated `data.js`
+- **Non-induction `M` module codes no longer appear (TECH-610).** An induction is always an `I` code. `M` codes are taught modules that hang off the same course descriptors, and they were listed on course pages alongside the real induction modules. Dropped on read from both spreadsheets
+- **Room numbers keep their trailing zero (TECH-609).** `3.30` was rendering as `3.3` — a room that does not exist — because the spreadsheet stores it as a number. Fixed across 169 event locations and 11 distinct rooms
+- Three course codes (`C3138FTC`, `U3826PYC`, `U4118FTC`) listed no induction module other than an `M` code and no longer appear in search; see workaround 8 in the root README
+
 **v2.1 (2026-09-03)**
 - **Courses are identified by course code, not by name (WD-1076).** Reported as "false duplicate pages not showing". Lookups and the address-bar slug were both derived from the course name, so two courses whose names differed only in case or punctuation shared a slug and only the first was ever reachable — and courses that genuinely share a name (the full-time and part-time routes of one degree) opened whichever came first, which could be the wrong timetable
 - **Slug and id now come from the data.** `data.js` stamps a guaranteed-unique `slug` and an `id` (the course code) on every course. `courseSlug()` and `courseId()` use them, falling back to the old name-derived rule so an older `data.js` still works, and so links shared before this change still resolve

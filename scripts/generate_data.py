@@ -73,11 +73,26 @@ Output:
    emits an explicit, guaranteed-unique `slug` per course — disambiguated
    with the course code where two courses genuinely share a name — and the
    renderers use that instead of re-deriving one.
+
+8. Non-induction "M" module codes  (TECH-610)
+   Both files carry module codes beginning with "M" — taught modules hanging
+   off the same course descriptors as the induction.  An induction is always
+   an "I" code, so every row carrying an "M" code is dropped on read, from
+   the modules workbook and the events export alike.
+
+9. Room numbers losing a trailing zero  (TECH-609)
+   Rooms that look like decimals are stored in the spreadsheet as numbers, so
+   "3.30" is really the number 3.3 and the zero is not in the file.  Every
+   room ending in a zero after the point was wrong on the page.  Numeric room
+   cells are now rendered to the export's own two-decimal convention.  Note
+   that `dtype={"Site": str}` on the read does not fix this — the cell is
+   already a float before pandas casts it.
 """
 
 import argparse
 import glob
 import json
+import numbers
 import os
 import re
 import sys
@@ -95,6 +110,19 @@ def find_file(directory: str, pattern: str) -> str | None:
     """Return the first file in *directory* whose name matches *pattern* (glob)."""
     matches = glob.glob(os.path.join(directory, pattern))
     return matches[0] if matches else None
+
+
+# ── TECH-610: an induction is always an "I" module code ──────────────────────
+# Both the modules workbook and the events export carry module codes beginning
+# with "M".  Those are taught modules that happen to hang off the same course
+# descriptors as the induction — they are not inductions, and a student has no
+# business seeing them on an induction page.  Rows carrying an "M" code are
+# dropped from both files on read, so a future export that still contains them
+# cannot put them back on the site.
+
+def is_excluded_module_code(code) -> bool:
+    """True for a module code that is not an induction code (i.e. starts M)."""
+    return str(code).strip().upper().startswith("M")
 
 
 def get_course_type(crs_code: str) -> str:
@@ -280,10 +308,51 @@ def link_label(url: str) -> str:
 
 # ── Site / Room pairing ───────────────────────────────────────────────────────
 
-def _split_list(value) -> list[str]:
+# Room numbers in this export read "<floor>.<two digits>" — 3.30, 1.10, 2.20.
+# Every room number the export happens to store as *text* uses exactly two
+# digits after the point, without a single exception across the whole file, so
+# two is the convention to restore a lost trailing zero to.
+ROOM_DECIMAL_PLACES = 2
+
+
+def cell_text(value) -> str:
+    """Text of a spreadsheet cell, without losing a room number's trailing zero.
+
+    Excel stores the room "3.30" as the *number* 3.3 — the trailing zero is
+    not in the file at all — so `str()` renders it back as "3.3", a room that
+    does not exist.  Every room ending in a zero after the point was silently
+    wrong on the page.  (TECH-609)
+
+    Worth recording why the obvious one-line fix does not work here: passing
+    `dtype={"Site": str, "Room": str}` to `read_excel` changes nothing,
+    because openpyxl has already parsed the cell to a float by the time pandas
+    applies the cast, and casting 3.3 to text gives "3.3" again.  The zero has
+    to be restored on the way out instead.
+
+    A non-integer number is therefore rendered to two decimal places.  A
+    number carrying more precision than the convention allows is left exactly
+    as it arrived rather than rounded, so anything unexpected stays visible
+    instead of being quietly changed into a different room.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, numbers.Number):
+        if pd.isna(value):
+            return ""
+        as_float = float(value)
+        if as_float.is_integer():
+            return str(int(as_float))
+        text = f"{as_float:.{ROOM_DECIMAL_PLACES}f}"
+        return text if float(text) == as_float else repr(as_float)
     if pd.isna(value):
-        return []
-    s = str(value).strip()
+        return ""
+    return str(value).strip()
+
+
+def _split_list(value) -> list[str]:
+    s = cell_text(value)
     if s == "" or s.lower() in ("nan", "nat", "none"):
         return []
     return [p.strip() for p in s.split(",") if p.strip() != ""]
@@ -483,6 +552,42 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
         sys.exit(1)
     if missing_ev:
         print(f"ERROR: events file is missing columns: {missing_ev}")
+        sys.exit(1)
+
+    # ── TECH-610: drop every non-induction ("M") module code ──────────────
+    # Applied to both files.  The modules workbook decides which codes reach a
+    # course page, so filtering it is what fixes the page; filtering the events
+    # export as well keeps the two consistent and saves reading several
+    # thousand rows that can no longer be attached to anything.
+    mod_rows_before = len(df_modules)
+    df_modules = df_modules[
+        ~df_modules["Mod Code"].apply(is_excluded_module_code)
+    ].copy()
+    mod_rows_dropped = mod_rows_before - len(df_modules)
+
+    ev_rows_before = len(df_events)
+    df_events = df_events[
+        ~df_events["Module"].apply(is_excluded_module_code)
+    ].copy()
+    ev_rows_dropped = ev_rows_before - len(df_events)
+
+    print(f"  Non-induction 'M' codes dropped: {mod_rows_dropped} module rows, "
+          f"{ev_rows_dropped} event rows  (inductions use the 'I' code only)")
+
+    # A code that is neither an I nor an M is not something this rule was
+    # written for, so say so rather than let it through unremarked.
+    unknown_codes = sorted({
+        str(c).strip() for c in df_modules["Mod Code"]
+        if not str(c).strip().upper().startswith("I")
+    })
+    if unknown_codes:
+        print(f"  NOTE: {len(unknown_codes)} module code(s) start with neither "
+              f"'I' nor 'M' and have been kept: "
+              f"{', '.join(unknown_codes[:10])}")
+
+    if df_modules.empty:
+        print("ERROR: no induction ('I') module codes left after filtering.")
+        print("  Is this the induction modules export?")
         sys.exit(1)
 
     df_modules["course_type"] = df_modules["Crs Code"].apply(get_course_type)

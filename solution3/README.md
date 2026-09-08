@@ -57,6 +57,12 @@ Replace `data.js` with a freshly generated file from updated spreadsheets. No ot
 
 ## Changelog
 
+**v1.11 (2026-09-08)**
+- **Data fix only — `app.js` and `styles.css` are unchanged.** Both fixes are in the shared pipeline; the app shell picks them up through a regenerated `data.js`
+- **Non-induction `M` module codes no longer appear (TECH-610).** An induction is always an `I` code; `M` codes are taught modules sharing the same course descriptors and were being listed alongside the real induction modules
+- **Room numbers keep their trailing zero (TECH-609).** `3.30` was rendering as `3.3`, across 169 event locations and 11 distinct rooms
+- Course cards: 415 → 412. Three course codes listed no induction module other than an `M` code; see workaround 8 in the root README
+
 **v1.10 (2026-09-03)**
 - **Fixed: induction events now list in time order within each day.** The timetable sorted events with `a.time > b.time`, a plain string comparison against 12-hour clock labels such as `9:00am`. Because `'9'` is greater than `'1'`, every `9:xxam` session sorted after `10:00am`, `11:00am` and all afternoon sessions, appearing at the bottom of its day instead of the top
 - Added `timeToMinutes()` and `compareEventsByTime()`, sorting on start time, then finish time, then title

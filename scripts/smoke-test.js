@@ -44,6 +44,32 @@ check('no event id repeats within a course-year',
     return new Set(ids).size === ids.length;
   })));
 
+// ── TECH-610: an induction is always an "I" module code ──────────────────
+const allModCodes = new Set();
+data.forEach(c => Object.values(c.years).forEach(y => {
+  (y.mod_codes || []).forEach(m => allModCodes.add(m));
+  allModCodes.add(y.mod_code);
+  y.events.forEach(e => allModCodes.add(e.mod_code));
+}));
+const nonInduction = [...allModCodes].filter(m => /^m/i.test(String(m)));
+check('no non-induction "M" module code reaches the data', nonInduction.length === 0,
+  nonInduction.slice(0, 8).join(', ') || `${allModCodes.size} codes, all "I"`);
+
+// ── TECH-609: a room ending in a zero keeps it ───────────────────────────
+// "3.30" is stored in the spreadsheet as the number 3.3, so a room rendered
+// with a single decimal place is the signature of the zero having been lost.
+const singleDp = new Set();
+let roomCount = 0;
+data.forEach(c => Object.values(c.years).forEach(y => y.events.forEach(e => {
+  (e.locations || []).forEach(l => {
+    if (!l.room) return;
+    roomCount++;
+    if (/^\d+\.\d$/.test(l.room)) singleDp.add(l.room);
+  });
+})));
+check('no room number has lost a trailing zero', singleDp.size === 0,
+  [...singleDp].join(', ') || `${roomCount} room references checked`);
+
 // Every course code from Ben's report must be individually addressable.
 const reported = ['U2437PYC','U2371FTC','U3275FTC','U3802PDC','U2896PDC','U1826PYC',
   'U3248PYC','U3518PYC','N3518FTC','P3211FTC','P0620FTC','P0620PTC','P0054FTC',
