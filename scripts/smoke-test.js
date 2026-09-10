@@ -125,8 +125,8 @@ function testSolution(label, dir, entry, cardSel, extras, page) {
   return window;
 }
 
-const w1 = testSolution('solution1', 'solution1', 'app.js', '.course-card', ['analytics.js']);
-const w3 = testSolution('solution3', 'solution3', 'app.js', '.course-card');
+const w1 = testSolution('solution1', 'solution1', 'app.js', '.course-card', ['analytics.js', 'external-links.js']);
+const w3 = testSolution('solution3', 'solution3', 'app.js', '.course-card', ['external-links.js']);
 testSolution('solution2 (widget)', 'solution2', 'induction-widget.js',
   '.uop-ind__course-item', [], 'demo-search-page.html');
 
@@ -146,5 +146,99 @@ if (w1) {
   }
 }
 
+// ── TECH-611: links off this site open in a new tab ─────────────────────
+// The site prefix baked into external-links.js, plus the origin the page is
+// served from, are "this site"; everything else must open in a new tab and
+// say so. The test URL above is example.org, so relative links stay internal
+// and the myport.port.ac.uk links in the markup count as external.
+function checkExternalLinks(label, window) {
+  if (!window) return;
+  console.log(`\n── ${label} external links (TECH-611) ──`);
+  const doc = window.document;
+  const prefixes = ['https://university-of-portsmouth-web-team.github.io/', 'https://example.org/'];
+
+  let external = 0, internal = 0, bad = [];
+  for (const a of doc.querySelectorAll('a[href]')) {
+    const raw = a.getAttribute('href') || '';
+    if (!raw || raw.charAt(0) === '#') { internal++; continue; }
+    let url;
+    try { url = new window.URL(raw, doc.baseURI).href; } catch (e) { continue; }
+    if (!/^https?:\/\//i.test(url)) continue;   // mailto:, tel:
+
+    const name = (a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 32) || raw;
+    if (prefixes.some(p => url.indexOf(p) === 0)) {
+      internal++;
+      if (a.getAttribute('target') === '_blank') bad.push(`internal "${name}" opens a new tab`);
+    } else {
+      external++;
+      const warns = /opens in a new (tab|window)/i.test(
+        (a.getAttribute('aria-label') || '') + ' ' + (a.textContent || ''));
+      if (a.getAttribute('target') !== '_blank') bad.push(`external "${name}" stays in the tab`);
+      if (!/noopener/.test((a.getAttribute('rel') || '').toLowerCase())) bad.push(`external "${name}" missing rel=noopener`);
+      if (!warns) bad.push(`external "${name}" gives no new-tab warning`);
+    }
+  }
+
+  check('found external links to check', external > 0, `${external} external, ${internal} internal`);
+  check('every external link opens in a new tab, warned and rel-protected',
+    bad.length === 0, bad.slice(0, 4).join('; ') || `${external} links correct`);
+}
+
+checkExternalLinks('solution1', w1);
+checkExternalLinks('solution3', w3);
+
+// The detail view is rendered after a click, so its links are annotated by
+// the MutationObserver rather than the initial pass.
+if (w1) {
+  const btn = w1.document.querySelector('.year-link');
+  if (btn) {
+    btn.click();
+    if (typeof w1.UOPExternalLinks !== 'undefined') w1.UOPExternalLinks.refresh();
+    checkExternalLinks('solution1 detail view', w1);
+
+    console.log('\n── TECH-611 narrow-screen timetable ──');
+    const scroll = w1.document.querySelector('.timetable-scroll');
+    check('timetable sits in a scroll region', !!scroll);
+    check('scroll region is keyboard reachable', scroll && scroll.getAttribute('tabindex') === '0');
+    check('scroll region has an accessible name',
+      scroll && !!w1.document.getElementById(scroll.getAttribute('aria-labelledby') || ''));
+    check('year switcher is a button group, not an unbacked tablist',
+      w1.document.querySelectorAll('[role="tablist"]').length === 0 &&
+      !!w1.document.querySelector('#detail-year-tabs[role="group"]'));
+    check('selected year is marked with aria-current',
+      w1.document.querySelectorAll('.year-tab[aria-current="true"]').length === 1);
+  }
+}
+
+// ── TECH-611: the narrow-screen CSS the fix depends on ──────────────────
+// boot() evals the scripts by hand, so a missing <script> tag would not
+// otherwise show up here — assert the pages actually load the handler.
+console.log('\n── TECH-611 script registration ──');
+for (const [dir, page] of [['solution1', 'index.html'], ['solution3', 'index.html'], ['.', 'index.html']]) {
+  const html = fs.readFileSync(path.join(ROOT, dir, page), 'utf8');
+  check(`${dir === '.' ? 'landing page' : dir}: loads external-links.js`,
+    /<script[^>]+src="external-links\.js"/.test(html));
+  const f = path.join(ROOT, dir, 'external-links.js');
+  check(`${dir === '.' ? 'landing page' : dir}: external-links.js is present`, fs.existsSync(f));
+}
+
+console.log('\n── TECH-611 stylesheet rules ──');
+for (const [dir, tableSel, scrollSel] of [['solution1', 'timetable-table', '.timetable-scroll'],
+                                          ['solution3', 'tt-table', '.tt-scroll']]) {
+  const css = fs.readFileSync(path.join(ROOT, dir, 'styles.css'), 'utf8');
+  const hidesColumns = new RegExp(`\\\\.${tableSel}\\\\s+(thead th|tbody td):nth-child\\\\(\\\\d\\\\)[^}]*display:\\\\s*none`).test(css);
+  check(`${dir}: no timetable column hidden on narrow screens`, !hidesColumns);
+  check(`${dir}: timetable scroll region is styled`, css.includes(scrollSel + ' {'));
+}
+{
+  // The sticky reset must come after the base rule or the cascade ignores it.
+  const css = fs.readFileSync(path.join(ROOT, 'solution1/styles.css'), 'utf8');
+  const base = css.indexOf('.detail-sidebar {\n  position: sticky;');
+  const reset = css.indexOf('position: static;', base);
+  check('solution1: sidebar sticky reset follows the base rule (cascade order)',
+    base !== -1 && reset > base, base === -1 ? 'base rule not found' : `base @${base}, reset @${reset}`);
+}
+
 console.log(`\n${failures === 0 ? 'All checks passed.' : failures + ' CHECK(S) FAILED.'}`);
+
 process.exit(failures ? 1 : 0);

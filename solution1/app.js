@@ -291,9 +291,9 @@
       return `<button type="button" class="year-link" 
         data-course-id="${escHtml(courseId(course))}" 
         data-year="${y.year}"
-        aria-label="View induction timetable for ${escHtml(courseFullName(course))}, ${label}">
+        aria-label="View induction timetable for ${escHtml(courseFullName(course))}, ${label}${count > 0 ? `, ${count} session${count !== 1 ? 's' : ''}` : ''}">
         ${escHtml(label)}
-        ${count > 0 ? `<span class="event-count" aria-label="${count} session${count !== 1 ? 's' : ''}">${count}</span>` : ''}
+        ${count > 0 ? `<span class="event-count" aria-hidden="true">${count}</span>` : ''}
       </button>`;
     }).join('');
 
@@ -302,7 +302,7 @@
         <span class="course-name">${escHtml(course.name)}${courseQualifier(course)
           ? ` <span class="course-code-qualifier">(${escHtml(courseQualifier(course))})</span>`
           : ''}</span>
-        <span class="course-type-badge badge-${course.course_type}" aria-label="Course type: ${typeLabel}">${typeLabel}</span>
+        <span class="course-type-badge badge-${course.course_type}"><span class="sr-only">Course type: </span>${typeLabel}</span>
       </div>
       <div class="year-links">
         ${yearLinksHtml.length ? yearLinksHtml : '<span class="no-events-badge">No induction events scheduled</span>'}
@@ -362,8 +362,9 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'year-tab' + (y.year === year ? ' active' : '');
-      btn.setAttribute('role', 'tab');
-      btn.setAttribute('aria-selected', y.year === year ? 'true' : 'false');
+      // aria-current, not aria-selected: this is a group of buttons, not
+      // a tablist. See the container in index.html.
+      if (y.year === year) btn.setAttribute('aria-current', 'true');
       btn.setAttribute('aria-label', `${YEAR_LABELS[y.year] || 'Year ' + y.year} — ${y.events.length} session${y.events.length !== 1 ? 's' : ''}`);
       btn.textContent = YEAR_LABELS[y.year] || `Year ${y.year}`;
       btn.addEventListener('click', () => {
@@ -438,9 +439,17 @@
     }
 
     let html = '';
+    let dayIndex = 0;
     for (const [dateKey, group] of Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]))) {
+      // The table sits in a scroll wrapper so every column survives a
+      // narrow screen. Room and finish time used to be hidden with
+      // display:none below 600px, which took them away from phone users
+      // altogether. The wrapper is focusable and named after the day so
+      // a keyboard user can reach and scroll it.
+      const dayHeadingId = `timetable-day-${++dayIndex}`;
       html += `<div class="timetable-day-group">
-        <h3 class="timetable-day-heading">${escHtml(group.label)}</h3>
+        <h3 class="timetable-day-heading" id="${dayHeadingId}">${escHtml(group.label)}</h3>
+        <div class="timetable-scroll" role="group" tabindex="0" aria-labelledby="${dayHeadingId}">
         <table class="timetable-table" aria-label="Induction events on ${escHtml(group.label)}">
           <thead>
             <tr>
@@ -464,22 +473,23 @@
           <td class="event-time">${escHtml(ev.finish)}</td>
         </tr>`;
       }
-      html += `</tbody></table></div>`;
+      html += `</tbody></table></div></div>`;
     }
     $timetableContent.innerHTML = html;
   }
 
   function buildLocationHtml(ev) {
     if (ev.is_online) {
-      return `<span class="online-badge" aria-label="Online session">
+      return `<span class="online-badge">
         <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-        </svg>Online</span>`;
+        </svg>Online<span class="sr-only"> session</span></span>`;
     }
 
     const locs = getLocations(ev);
     if (!locs.length) {
-      return '<span class="event-location" aria-label="Location not specified">—</span>';
+      return '<span class="event-location"><span aria-hidden="true">—</span>'
+        + '<span class="sr-only">Location not specified</span></span>';
     }
     if (locs.length === 1) {
       return `<span aria-hidden="true">📍 </span>${escHtml(formatLocation(locs[0]))}`;

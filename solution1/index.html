@@ -70,7 +70,7 @@
           <!-- filled by JS -->
         </div>
 
-        <div id="courses-listing" class="courses-listing" role="list">
+        <div id="courses-listing" class="courses-listing">
           <div class="loading-state" id="loading-state" aria-live="polite">
             <div class="spinner" aria-hidden="true"></div>
             <p>Loading courses…</p>
@@ -89,13 +89,16 @@
             </svg>
             Back to all inductions
           </button>
-          <div id="detail-breadcrumb" class="detail-breadcrumb" aria-label="Current location"></div>
+          <div id="detail-breadcrumb" class="detail-breadcrumb"></div>
         </div>
       </div>
       <div class="detail-content">
         <div class="detail-main">
           <h1 id="detail-course-name" tabindex="-1"></h1>
-          <div id="detail-year-tabs" class="year-tabs" role="tablist" aria-label="Select year of study"></div>
+          <!-- A group of buttons rather than an ARIA tablist: each one re-renders
+               the whole view, and there are no tabpanels or arrow-key bindings
+               for a tablist to promise. The selected year carries aria-current. -->
+          <div id="detail-year-tabs" class="year-tabs" role="group" aria-label="Select year of study"></div>
           <div id="detail-welcome" class="welcome-block"></div>
           <div id="detail-accounts" class="accounts-block"></div>
           <section id="timetable-section" aria-labelledby="timetable-heading">
@@ -104,33 +107,33 @@
           </section>
           <section class="queries-block" aria-labelledby="queries-heading">
             <h2 id="queries-heading">If you have any queries</h2>
-            <p>If you have any questions about your induction, please contact your School or Department office. You can also visit the <a href="https://myport.port.ac.uk">MyPort Student Portal</a> for further guidance.</p>
-            <p>For IT and online account queries, please contact <a href="mailto:itsupport@port.ac.uk">itsupport@port.ac.uk</a> or visit the <a href="https://myport.port.ac.uk/it-support/student-it-support">IT Support pages</a>.</p>
+            <p>If you have any questions about your induction, please contact your School or Department office. You can also visit the <a href="https://myport.port.ac.uk" target="_blank" rel="noopener noreferrer" data-external-link>MyPort Student Portal<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a> for further guidance.</p>
+            <p>For IT and online account queries, please contact <a href="mailto:itsupport@port.ac.uk">itsupport@port.ac.uk</a> or visit the <a href="https://myport.port.ac.uk/it-support/student-it-support" target="_blank" rel="noopener noreferrer" data-external-link>IT Support pages<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a>.</p>
           </section>
           <section class="international-block" aria-labelledby="international-heading">
             <h2 id="international-heading">International students</h2>
-            <p>If you are an international student, you may also need to attend additional orientation sessions. Please check your email and the <a href="https://myport.port.ac.uk/student-services/international-student-advice">International Students pages</a> for further information about visa sign-in sessions, English language support and other important requirements.</p>
+            <p>If you are an international student, you may also need to attend additional orientation sessions. Please check your email and the <a href="https://myport.port.ac.uk/student-services/international-student-advice" target="_blank" rel="noopener noreferrer" data-external-link>International Students pages<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a> for further information about visa sign-in sessions, English language support and other important requirements.</p>
           </section>
           <section class="further-info-block" aria-labelledby="further-info-heading">
             <h2 id="further-info-heading">Further information</h2>
             <ul>
-              <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions">Campus maps and building locations</a></li>
-              <li><a href="https://myport.port.ac.uk/student-services">Student services</a></li>
-              <li><a href="https://www.upsu.net">Portsmouth Students' Union</a></li>
-              <li><a href="https://myport.port.ac.uk/student-services/student-life/supporting-your-studies/library">Library and study spaces</a></li>
+              <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions" target="_blank" rel="noopener noreferrer" data-external-link>Campus maps and building locations<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
+              <li><a href="https://myport.port.ac.uk/student-services" target="_blank" rel="noopener noreferrer" data-external-link>Student services<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
+              <li><a href="https://www.upsu.net" target="_blank" rel="noopener noreferrer" data-external-link>Portsmouth Students' Union<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
+              <li><a href="https://myport.port.ac.uk/student-services/student-life/supporting-your-studies/library" target="_blank" rel="noopener noreferrer" data-external-link>Library and study spaces<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
             </ul>
           </section>
         </div>
         <div class="detail-sidebar">
-          <div class="sidebar-card" aria-labelledby="sidebar-need-help-heading">
+          <div class="sidebar-card">
             <h3 id="sidebar-need-help-heading">Need help?</h3>
             <ul class="sidebar-links">
-              <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions">View campus maps</a></li>
-              <li><a href="https://myport.port.ac.uk/it-support/student-it-support">IT Support</a></li>
-              <li><a href="https://myport.port.ac.uk/student-services/student-wellbeing">Student Wellbeing</a></li>
+              <li><a href="https://myport.port.ac.uk/welcome/maps-and-directions" target="_blank" rel="noopener noreferrer" data-external-link>View campus maps<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
+              <li><a href="https://myport.port.ac.uk/it-support/student-it-support" target="_blank" rel="noopener noreferrer" data-external-link>IT Support<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
+              <li><a href="https://myport.port.ac.uk/student-services/student-wellbeing" target="_blank" rel="noopener noreferrer" data-external-link>Student Wellbeing<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a></li>
             </ul>
           </div>
-          <div class="sidebar-card" id="sidebar-mod-info" aria-label="Module information">
+          <div class="sidebar-card" id="sidebar-mod-info">
             <h3>Module information</h3>
             <dl id="sidebar-dl"></dl>
           </div>
@@ -141,6 +144,10 @@
 
   <script src="data.js"></script>
   <script src="analytics.js"></script>
+  <!-- Any link that leaves this site opens in a new tab and says so.
+       Covers the links rendered from data.js; the static ones above
+       carry the same attributes in the markup. -->
+  <script src="external-links.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

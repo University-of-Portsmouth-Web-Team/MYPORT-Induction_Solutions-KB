@@ -200,7 +200,7 @@
           <div class="course-card-top">
             <span class="course-card-name">${esc(c.name)}${courseQualifier(c)
               ? ` <span class="course-code-qualifier">(${esc(courseQualifier(c))})</span>` : ''}</span>
-            <span class="type-pill pill-${c.course_type}" aria-label="${typeLabel}">${typeLabel}</span>
+            <span class="type-pill pill-${c.course_type}"><span class="sr-only">Course type: </span>${typeLabel}</span>
           </div>
           <div class="year-strip">${yBtns || '<span style="font-size:.8125rem;color:#888;font-style:italic">No sessions yet</span>'}</div>
         </li>`;
@@ -234,6 +234,7 @@
       const lbl = YEAR_LABELS[y.year] || 'Year ' + y.year;
       return `<button type="button" class="year-tab${y.year === year ? ' active' : ''}"
         data-year="${y.year}"
+        ${y.year === year ? 'aria-current="true"' : ''}
         aria-label="${lbl}${y.events.length ? ', ' + y.events.length + ' sessions' : ''}">
         ${esc(lbl)}</button>`;
     }).join('');
@@ -250,9 +251,17 @@
         if (!byDate[k]) byDate[k] = { label: ev.date, events: [] };
         byDate[k].events.push(ev);
       }
+      let dayIndex = 0;
       for (const [dk, grp] of Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]))) {
+        // The date is a real heading rather than a styled div, so it
+        // appears in a screen reader's heading list (WCAG 2.2 1.3.1).
+        // The table then sits in a focusable scroll region: all four
+        // columns are kept on a narrow screen instead of room and
+        // finish time being hidden with display:none.
+        const dayHeadingId = `tt-day-${++dayIndex}`;
         ttHtml += `<div class="day-block">
-          <div class="day-heading">${esc(grp.label)}</div>
+          <h3 class="day-heading" id="${dayHeadingId}">${esc(grp.label)}</h3>
+          <div class="tt-scroll" role="group" tabindex="0" aria-labelledby="${dayHeadingId}">
           <table class="tt-table" aria-label="Events on ${esc(grp.label)}">
             <thead><tr>
               <th scope="col">Time</th><th scope="col">Session</th>
@@ -270,13 +279,13 @@
             <td class="ev-time">${esc(ev.finish)}</td>
           </tr>`;
         }
-        ttHtml += `</tbody></table></div>`;
+        ttHtml += `</tbody></table></div></div>`;
       }
     }
 
     $detailContent.innerHTML = `
       <h1 tabindex="-1">${esc(courseFullName(course))}</h1>
-      <div class="year-tab-strip" role="tablist" aria-label="Year of study">${tabs}</div>
+      <div class="year-tab-strip" role="group" aria-label="Year of study">${tabs}</div>
       <div class="welcome-block">${texts.welcome}</div>
       <div class="accounts-block">${texts.accounts}</div>
       <div class="tt-section">
@@ -316,7 +325,7 @@
 
   function locHtml(ev) {
     if (ev.is_online) {
-      return `<span class="online-tag" aria-label="Online session">⬛ Online</span>`;
+      return `<span class="online-tag"><span aria-hidden="true">⬛</span> Online<span class="sr-only"> session</span></span>`;
     }
     const locs = getLocations(ev);
     if (!locs.length) return '<span aria-label="Location not yet specified">—</span>';

@@ -17,7 +17,13 @@
   --color-bg-warm: #F2FAFF;
   --color-surface: #ffffff;
   --color-border: #D1D1D1;
-  --color-border-strong: #ABAAAA;
+  /* Borders of interactive controls — the search field, filter
+     buttons and year tabs. WCAG 2.2 1.4.11 Non-text Contrast wants
+     3:1 against the adjacent background for anything needed to
+     identify a control, and an empty text field is identified by its
+     border alone. #ABAAAA managed only 2.32:1; #8C8C8C reaches
+     3.36:1 on white and 3.22:1 on the page background. */
+  --color-border-strong: #8C8C8C;
   --color-text: #3C3C3C;
   --color-text-secondary: #505457;
   --color-text-muted: #505457;
@@ -386,7 +392,9 @@ h3 { font-size: 1.125rem; }
   text-decoration: none;
   padding: 6px 14px;
   background: var(--color-surface);
-  border: 2px solid var(--color-border);
+  /* Same control-border token as .filter-btn and .year-tab — this is a
+     button, and its outline is what identifies it as one (1.4.11). */
+  border: 2px solid var(--color-border-strong);
   border-radius: 0;
   transition: all var(--transition);
   cursor: pointer;
@@ -510,7 +518,11 @@ h3 { font-size: 1.125rem; }
   .detail-content {
     grid-template-columns: 1fr;
   }
-  .detail-sidebar { order: -1; }
+  /* The narrow-screen sidebar reset lives with the .detail-sidebar rule
+     further down this file, not here. Both rules have the same
+     specificity, so whichever comes last wins — putting the override
+     above the base rule left position:sticky in force at every width,
+     which is the bug this was meant to fix. */
 }
 
 .detail-main h1 {
@@ -696,6 +708,29 @@ h3 { font-size: 1.125rem; }
   position: sticky;
   top: var(--space-lg);
 }
+
+/* Narrow screens: two things have to stop happening once the detail
+   grid collapses to a single column.
+
+   1. position:sticky is only meaningful beside the content. In one
+      column the sidebar became a short sticky block inside a tall
+      container, so "Need help?" and "Module information" pinned
+      themselves to the top of the viewport and scrolled over the
+      timetable.
+   2. order:-1 put those two cards above the main content visually while
+      leaving them after it in the DOM, so the reading order and the tab
+      order disagreed with what was on screen (WCAG 2.2 1.3.2 Meaningful
+      Sequence / 2.4.3 Focus Order). They now follow the timetable,
+      which is what a student came for anyway.
+
+   This block must stay AFTER the rule above to win the cascade. */
+@media (max-width: 860px) {
+  .detail-sidebar {
+    position: static;
+    top: auto;
+    order: 0;
+  }
+}
 .sidebar-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -746,14 +781,42 @@ h3 { font-size: 1.125rem; }
   .course-card-header { flex-direction: column; align-items: flex-start; }
   .filter-bar { flex-direction: column; align-items: flex-start; }
   .detail-content { padding: var(--space-lg) var(--space-md); }
+  .detail-header-inner { padding: 0 var(--space-md); }
   .timetable-table { font-size: 0.875rem; }
-  .timetable-table thead th:nth-child(4) { display: none; }
-  .timetable-table tbody td:nth-child(4) { display: none; }
+  .timetable-table thead th,
+  .timetable-table tbody td { padding: var(--space-sm) var(--space-md); }
 }
 
-@media (max-width: 480px) {
-  .timetable-table thead th:nth-child(3) { display: none; }
-  .timetable-table tbody td:nth-child(3) { display: none; }
+/* Timetable scroll region
+   ------------------------------------------------------------
+   A four-column timetable does not fit a phone, and the columns
+   used to be removed with display:none — room below 600px and
+   finish time below 480px — so a student on a phone could not see
+   where their session was. All four columns are kept and the table
+   scrolls sideways instead, which WCAG 2.2 1.4.10 Reflow allows
+   for data tables. The region is focusable so it can be scrolled
+   from the keyboard as well as by touch. */
+.timetable-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.timetable-scroll .timetable-table {
+  min-width: 30rem;
+}
+.timetable-scroll:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Marker on links that leave this site. Decorative — the wording
+   that carries the meaning is the visually hidden "(opens in a new
+   tab)" next to it. */
+.external-link-marker {
+  display: inline-block;
+  margin-left: 0.15em;
+  font-size: 0.85em;
+  line-height: 1;
 }
 
 /* Hidden utility */

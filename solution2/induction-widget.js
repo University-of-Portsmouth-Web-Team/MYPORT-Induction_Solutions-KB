@@ -244,8 +244,26 @@
     }
     .uop-ind__day-hd {
       font-size: 0.9375rem; font-weight: 700; color: var(--ui-white);
+      font-family: inherit;
       background: var(--ui-head); padding: 8px 10px;
       border-radius: 0; margin: 12px 0 0;
+    }
+    /* All four columns are kept on a narrow screen and the table
+       scrolls sideways instead of losing columns — WCAG 2.2 1.4.10
+       Reflow allows two-dimensional scrolling for data tables.
+       Focusable so it can also be scrolled from the keyboard. */
+    .uop-ind__tt-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+    }
+    .uop-ind__tt-scroll .uop-ind__tt { min-width: 28rem; }
+    .uop-ind__tt-scroll:focus-visible { outline: 3px solid var(--ui-focus); outline-offset: 2px; }
+    /* Marker on links that leave the host site. Decorative — the
+       visually hidden "(opens in a new tab)" carries the meaning. */
+    .uop-ind__ext {
+      display: inline-block; margin-left: 0.15em;
+      font-size: 0.85em; line-height: 1;
     }
     .uop-ind__loc-list { list-style: none; margin: 0; padding: 0; }
     .uop-ind__loc-list li { display: block; }
@@ -384,7 +402,90 @@
       this.container.setAttribute('role', 'region');
       this.container.setAttribute('aria-label', 'Course induction timetables');
       this.render();
+      this.watchExternalLinks();
       this.loadData();
+    }
+
+    // ── External links ─────────────────────────────────────────
+    // Anything pointing off the host site opens in a new tab and says
+    // so, for sighted and screen reader users alike — WCAG 2.2
+    // technique G201, which is how SC 3.2.5 Change on Request is met.
+    //
+    // Scoped to this widget's container: the links belonging to the
+    // page the widget is embedded in are left completely alone.
+
+    // "This site" is whatever page the widget has been dropped into —
+    // MyPort, in production. An extra prefix can be declared on the
+    // container with data-uop-induction-site="https://example.ac.uk/".
+    sitePrefixes() {
+      const list = [];
+      const declared = this.container.getAttribute('data-uop-induction-site');
+      if (declared) list.push(declared);
+      if (/^https?:$/.test(window.location.protocol)) {
+        list.push(window.location.origin + '/');
+      }
+      return list;
+    }
+
+    markExternalLinks(root) {
+      if (!root || root.nodeType !== 1) return;
+
+      const anchors = [];
+      if (root.matches && root.matches('a[href]')) anchors.push(root);
+      if (root.querySelectorAll) anchors.push(...root.querySelectorAll('a[href]'));
+
+      const prefixes = this.sitePrefixes();
+      const NOTICE = ' (opens in a new tab)';
+
+      for (const a of anchors) {
+        // Already done, either by this method or by the markup the
+        // "Join online session" links are built with.
+        if (a.hasAttribute('data-external-link')) continue;
+        if (a.getAttribute('target') === '_blank' &&
+            /opens in a new (tab|window)/i.test(
+              (a.getAttribute('aria-label') || '') + ' ' + (a.textContent || ''))) continue;
+        if (a.hasAttribute('download')) continue;
+
+        const raw = a.getAttribute('href') || '';
+        if (!raw || raw.charAt(0) === '#') continue;
+
+        let resolved;
+        try { resolved = new URL(raw, document.baseURI).href; } catch (e) { continue; }
+        if (!/^https?:\/\//i.test(resolved)) continue;   // mailto:, tel:, javascript:
+        if (prefixes.some(p => resolved.indexOf(p) === 0)) continue;
+
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+        a.setAttribute('data-external-link', '');
+
+        // An aria-label replaces the link text for screen reader users,
+        // so where one is present the notice goes on the label.
+        const label = a.getAttribute('aria-label');
+        if (label) {
+          a.setAttribute('aria-label', label.replace(/\s+$/, '') + NOTICE);
+        } else {
+          const notice = document.createElement('span');
+          notice.className = 'sr-only';
+          notice.textContent = NOTICE;
+          a.appendChild(notice);
+        }
+
+        const marker = document.createElement('span');
+        marker.className = 'uop-ind__ext';
+        marker.setAttribute('aria-hidden', 'true');
+        marker.textContent = '\u2197';
+        a.appendChild(marker);
+      }
+    }
+
+    watchExternalLinks() {
+      this.markExternalLinks(this.container);
+      if (!window.MutationObserver) return;
+      new MutationObserver(records => {
+        for (const r of records) {
+          for (const node of r.addedNodes) this.markExternalLinks(node);
+        }
+      }).observe(this.container, { childList: true, subtree: true });
     }
 
     render() {
@@ -550,7 +651,7 @@
             <div class="uop-ind__course-hd">
               <span class="uop-ind__course-nm">${this.escHtml(c.name)}${courseQualifier(c, this.sharedNames)
                 ? ` <span class="uop-ind__course-code">(${this.escHtml(courseQualifier(c, this.sharedNames))})</span>` : ''}</span>
-              <span class="uop-ind__badge uop-ind__badge-${c.course_type}" aria-label="${typeLabel}">${typeLabel}</span>
+              <span class="uop-ind__badge uop-ind__badge-${c.course_type}"><span class="sr-only">Course type: </span>${typeLabel}</span>
             </div>
             <div class="uop-ind__year-row">${yearBtns}</div>
           </li>`;
@@ -597,6 +698,7 @@
         const lbl = YEAR_LABELS[y.year] || `Year ${y.year}`;
         return `<button type="button" class="uop-ind__yr-tab${y.year === year ? ' active' : ''}"
           aria-label="${lbl}${y.events.length ? ', ' + y.events.length + ' sessions' : ''}"
+          ${y.year === year ? 'aria-current="true"' : ''}
           data-year="${y.year}">${this.escHtml(lbl)}</button>`;
       }).join('');
 
@@ -611,8 +713,14 @@
           if (!byDate[k]) byDate[k] = { label: ev.date, events: [] };
           byDate[k].events.push(ev);
         }
+        let dayIndex = 0;
         for (const [dk, grp] of Object.entries(byDate).sort((a, b) => a[0].localeCompare(b[0]))) {
-          ttHtml += `<div class="uop-ind__day-hd">${this.escHtml(grp.label)}</div>
+          // The date is a real heading rather than a styled div, so it
+          // reaches a screen reader's heading list (WCAG 2.2 1.3.1).
+          // h4 keeps the hierarchy under the h3 above the timetable.
+          const dayHeadingId = `${this.widgetId}-day-${++dayIndex}`;
+          ttHtml += `<h4 class="uop-ind__day-hd" id="${dayHeadingId}">${this.escHtml(grp.label)}</h4>
+            <div class="uop-ind__tt-scroll" role="group" tabindex="0" aria-labelledby="${dayHeadingId}">
             <table class="uop-ind__tt" aria-label="${this.escHtml(grp.label)}">
               <thead><tr>
                 <th scope="col">Time</th><th scope="col">Session</th><th scope="col">Location</th><th scope="col">Ends</th>
@@ -629,13 +737,13 @@
               <td class="uop-ind__ev-time">${this.escHtml(ev.finish)}</td>
             </tr>`;
           }
-          ttHtml += `</tbody></table>`;
+          ttHtml += `</tbody></table></div>`;
         }
       }
 
       this.$detailDiv.innerHTML = `<div class="uop-ind__detail-inner">
         <h2 class="uop-ind__detail-h1" tabindex="-1">${this.escHtml(courseFullName(course, this.sharedNames))}</h2>
-        <div class="uop-ind__yr-tabs" role="tablist">${tabs}</div>
+        <div class="uop-ind__yr-tabs" role="group" aria-label="Select year of study">${tabs}</div>
         <div class="uop-ind__welcome">${texts.welcome}</div>
         <div class="uop-ind__accounts">${texts.accounts}</div>
         <h3 style="font-size:1rem;margin:16px 0 8px;color:var(--ui-head)">Your induction timetable — ${this.escHtml(yl)}</h3>
@@ -666,7 +774,7 @@
 
     buildLoc(ev) {
       if (ev.is_online) {
-        return `<span class="uop-ind__online-badge" aria-label="Online session">⬛ Online</span>`;
+        return `<span class="uop-ind__online-badge"><span aria-hidden="true">⬛</span> Online<span class="sr-only"> session</span></span>`;
       }
       const locs = this.getLocations(ev);
       if (!locs.length) return '—';

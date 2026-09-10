@@ -539,13 +539,34 @@ h3 { font-size: 1.0625rem; }
 .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--navy); border-radius: 0; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 640px) {
-  .tt-table thead th:nth-child(4),
-  .tt-table tbody td:nth-child(4) { display: none; }
+/* Timetable scroll region
+   ------------------------------------------------------------
+   Room (below 480px) and finish time (below 640px) used to be
+   removed with display:none, so a phone user could not see where
+   their session was. All four columns are kept and the table
+   scrolls sideways instead, which WCAG 2.2 1.4.10 Reflow allows
+   for data tables. Focusable so it can be scrolled by keyboard. */
+.tt-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
-@media (max-width: 480px) {
-  .tt-table thead th:nth-child(3),
-  .tt-table tbody td:nth-child(3) { display: none; }
+.tt-scroll .tt-table { min-width: 30rem; }
+.tt-scroll:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .tt-table { font-size: 0.85rem; }
+  .tt-table thead th,
+  .tt-table tbody td { padding: 9px 10px; }
+}
+
+/* Marker on links that leave this site. Decorative — the visually
+   hidden "(opens in a new tab)" beside it carries the meaning. */
+.external-link-marker {
+  display: inline-block;
+  margin-left: 0.15em;
+  font-size: 0.85em;
+  line-height: 1;
 }
 
 /* Screen-reader-only utility */

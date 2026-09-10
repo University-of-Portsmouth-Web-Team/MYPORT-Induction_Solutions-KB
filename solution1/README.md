@@ -175,3 +175,10 @@ No personal data is collected — only course names, years and search terms. `se
 - Fixed A–Z letter index to sort by course subject title, not award prefix (BA/BSc/MSc etc.); also fixed non-alpha characters (brackets, hyphens) appearing as index entries
 - Added Module ID / Course code footnote to course detail page (was missing from this solution)
 - Removed "Induction module ID" and "Course code" rows from the right-hand detail card (IDs now appear only in the footnote)
+
+## Accessibility (v2.3, TECH-611)
+
+Links that leave the site open in a new tab and say so (`external-links.js`). The support cards no longer float over the timetable on narrow screens, and the timetable keeps all four columns in a scrollable region instead of hiding Location and Finishes.
+
+See `ACCESSIBILITY.md` at the repository root for the audit, and run
+`node scripts/a11y-audit.js` to reproduce it.

@@ -138,3 +138,10 @@ Replace `data.js` with a freshly generated file from updated spreadsheets. No ot
 **v1.1 (2026-06-08)**
 - Removed Module ID / Event ID from individual timetable rows (kept in course detail footnote)
 - Fixed A–Z letter index to sort by course subject title, not award prefix; fixed non-alpha characters appearing as index entries
+
+## Accessibility (v2.3, TECH-611)
+
+Off-site links open in a new tab and say so — scoped to the widget container, so the host page's own links are untouched. Day headings are real `<h4>` elements and the timetable scrolls sideways rather than losing columns.
+
+See `ACCESSIBILITY.md` at the repository root for the audit, and run
+`node scripts/a11y-audit.js` to reproduce it.

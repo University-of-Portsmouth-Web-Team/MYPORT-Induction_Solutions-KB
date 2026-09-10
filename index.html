@@ -31,6 +31,15 @@
       min-height: 100vh;
     }
 
+    /* Marker on links that leave this site — decorative; the
+       visually hidden "(opens in a new tab)" carries the meaning. */
+    .external-link-marker {
+      display: inline-block;
+      margin-left: 0.15em;
+      font-size: 0.85em;
+      line-height: 1;
+    }
+
     /* ── Header ── */
     .site-header {
       background: var(--navy);
@@ -267,7 +276,7 @@
 
 <header class="site-header" role="banner">
   <div class="header-inner">
-    <a class="uop-wordmark" href="https://www.port.ac.uk" aria-label="University of Portsmouth">
+    <a class="uop-wordmark" href="https://www.port.ac.uk" target="_blank" rel="noopener noreferrer" data-external-link aria-label="University of Portsmouth (opens in a new tab)">
       <img src="favicon.png" alt="" width="36" height="36" style="display:block">
       <span class="wordmark-text">University of <span>Portsmouth</span></span>
     </a>
@@ -281,17 +290,17 @@
   <h1>Induction Timetable</h1>
   <p class="page-intro">Three proof-of-concept solutions for the University of Portsmouth induction timetable. Each approach has different integration characteristics — explore them below and open whichever you'd like to review.</p>
 
-  <div class="card-grid" role="list">
+  <div class="card-grid">
 
     <!-- Solution 1 -->
-    <article class="card" role="listitem">
+    <article class="card">
       <div class="card-accent card-accent-1" aria-hidden="true"></div>
       <div class="card-body">
         <p class="card-label">Solution 1</p>
         <h2>Standalone Static Site</h2>
         <p>A fully self-contained site. Works as a microsite, on GitHub Pages, or embedded via iframe into MyPort.</p>
       </div>
-      <div class="card-tags" aria-label="Solution tags">
+      <div class="card-tags">
         <span class="tag">Static HTML</span>
         <span class="tag">Standalone</span>
         <span class="tag">iframe-ready</span>
@@ -303,14 +312,14 @@
     </article>
 
     <!-- Solution 2 -->
-    <article class="card" role="listitem">
+    <article class="card">
       <div class="card-accent card-accent-2" aria-hidden="true"></div>
       <div class="card-body">
         <p class="card-label">Solution 2</p>
         <h2>Embeddable Widget</h2>
         <p>A drop-in JavaScript widget that integrates directly into any existing MyPort page with no style bleed.</p>
       </div>
-      <div class="card-tags" aria-label="Solution tags">
+      <div class="card-tags">
         <span class="tag">JS Widget</span>
         <span class="tag">MyPort-native</span>
         <span class="tag">Zero bleed</span>
@@ -322,14 +331,14 @@
     </article>
 
     <!-- Solution 3 -->
-    <article class="card" role="listitem">
+    <article class="card">
       <div class="card-accent card-accent-3" aria-hidden="true"></div>
       <div class="card-body">
         <p class="card-label">Solution 3</p>
         <h2>Progressive Web App</h2>
         <p>An app-shell layout with a persistent sidebar, recently-viewed history, and deep-linkable course URLs.</p>
       </div>
-      <div class="card-tags" aria-label="Solution tags">
+      <div class="card-tags">
         <span class="tag">App shell</span>
         <span class="tag">Recently viewed</span>
         <span class="tag">Deep links</span>
@@ -350,8 +359,10 @@
 </main>
 
 <footer class="site-footer" role="contentinfo">
-  University of Portsmouth · Digital Experience · <a href="https://digitaluop.atlassian.net/browse/UX-571">UX-571</a>
+  University of Portsmouth · Digital Experience · <a href="https://digitaluop.atlassian.net/browse/UX-571" target="_blank" rel="noopener noreferrer" data-external-link>UX-571<span class="sr-only"> (opens in a new tab)</span><span class="external-link-marker" aria-hidden="true">↗</span></a>
 </footer>
 
+  <!-- Any link that leaves this site opens in a new tab and says so. -->
+  <script src="external-links.js"></script>
 </body>
 </html>
