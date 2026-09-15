@@ -186,6 +186,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v2.4 | 2026-09-15 | **Mal-formed online joining links are no longer shown as buttons (TECH-614).** The `Details` field in the timetable export has a length limit and the Teams or Zoom joining link is almost always the last thing in it, so the link is what gets clipped. Half a Teams address still looks like an address: **87 event rows across 84 sessions** were rendering as a clickable “Join online session” button that lands the student on a Teams error page as their induction starts. Two faults were compounding. The pipeline was already rejecting these five distinct URLs — all `meetup-join` links cut off before the `%40thread` conversation id — but rejection meant *leaving the URL as plain text in the description*, and each renderer's `linkifyDescription` then turned it straight back into a link, undoing the check. `scripts/generate_data.py` gains `is_meeting_url()` and `meeting_url_problem()`, which apply structural checks to live-session hosts only (Teams `%40thread` conversation id; Teams `/meet/` id and passcode lengths; Zoom 9–12 digit ids and `pwd` length; dangling percent-escapes; empty trailing parameters). A link that fails is **removed from the description text** rather than left in it, and the event flagged `online_link_issue`. All three renderers show **“Check with your course leader for online link”** where the join button would have been — as a `<p>`, deliberately not styled as a link, since there is nothing to click and a disabled-looking button only invites repeat clicks. Each renderer also refuses to linkify a Teams/Zoom URL still sitting inline (by construction those are ones the builder rejected) and any host without a valid TLD — which incidentally stopped `https://student-system` being advertised as “Join online session”, wrong on both counts. Working links are unchanged at 140 before and after; the three `data.js` files remain byte-identical to each other and to the Cloudflare deployment's. The build log now lists the distinct broken links with reasons so they can be sent to CTU — this is a display-side safety net, **not** a data fix. `scripts/smoke-test.js` gains 25 assertions covering all three solutions, including a synthesised legacy-shaped `data.js` that exercises the renderer guard itself; `scripts/a11y-audit.js` gains contrast and structural cover for the notice (8.82:1 on white). Mutation-tested: suppressing the notice fails 7 assertions, removing the renderer guard fails 6 |
 | v2.3 | 2026-09-10 | **Links off the site open in a new tab; narrow-screen layout fixed; WCAG 2.2 AA audit (TECH-611).** Every link that leaves the site now opens in a new tab with `rel="noopener noreferrer"`, a visible `↗` and a visually hidden "(opens in a new tab)" — the warning is what makes the behaviour accessible (WCAG technique G201), and `noopener` closes the reverse-tabnabbing hole a bare `target="_blank"` opens. "This site" means the deployed prefix plus whatever origin the page is served from, so preview URLs and a future `port.ac.uk` hostname need no code change; in-page anchors, `mailto:` and `tel:` are left alone. Static links carry the attributes in the markup so they work without JavaScript, and `external-links.js` covers the links built at runtime from `data.js`. **Fixed: "Need help?" and "Module information" floated over the timetable on narrow screens** — `.detail-sidebar` kept `position: sticky` after the grid collapsed to one column, so a short sticky block inside a tall container pinned itself to the viewport. Its `order: -1` also put those cards above the main content visually while leaving them after it in the DOM, so reading, tab and visual order disagreed (1.3.2, 2.4.3); they now follow the timetable. **The timetable no longer deletes columns on phones** — Location was hidden below 600px and Finishes below 480px with `display: none`, so a student on a phone could not see which room their induction was in. All four columns are kept in a focusable horizontal-scroll region, which SC 1.4.10 Reflow permits for data tables. **Six pre-existing WCAG A/AA failures found and fixed by a new audit:** `role="list"` on containers holding `<section>`/`<article>` children (1.3.1, critical); the year switcher claiming to be an ARIA `tablist` without arrow-key navigation or tabpanels — now a labelled button group with `aria-current` (1.3.1, 4.1.2); `aria-label` on generic elements, which ARIA 1.2 prohibits (4.1.2); `--color-border-strong` at 2.32:1 on the search field, filter buttons and year tabs, raised to `#8C8C8C` at 3.36:1 (1.4.11); and a decorative block character being read aloud in the online badges (1.1.1). Applied across all three solutions and the landing page; for the solution 2 widget the link handling is scoped to its own container, so the links on the host page it is embedded in are never touched. Solutions 2 and 3 also gained real `<h3>`/`<h4>` day headings in place of styled `<div>`s (1.3.1), and the landing page shed `role="listitem"` from three `<article>` elements, which is not an allowed role there. New `scripts/a11y-audit.js` runs the whole audit over eight page states — axe-core against the WCAG 2.0/2.1/2.2 A and AA rule sets, the external-link rules, colour contrast computed from the design tokens, and the responsive CSS cascade resolved at three viewport widths. `scripts/smoke-test.js` gained regression assertions for all of the above, including one on the source order of the sticky reset — the first attempt at the sidebar fix was placed above the base rule and lost the cascade. Both suites were mutation-tested, so the passes are load-bearing rather than vacuous. New `ACCESSIBILITY.md` reports the result — no failures found, with the manual checks automation cannot cover listed explicitly. No change to `data.js` or the data pipeline — all three solutions and the landing page were updated together |
 | v2.2 | 2026-09-08 | **Two data faults fixed — TECH-610 and TECH-609.** Non-induction `M` module codes are now dropped on read from both the modules workbook and the timetable export (6,232 event rows); an induction is always an `I` code. Room numbers stored as decimals no longer lose a trailing zero — `3.30` was rendering as `3.3`, a room that does not exist, across 169 event locations and 11 distinct rooms. Both fixes are in the pipeline, so a future export carrying the same faults cannot reintroduce them; both are guarded by new assertions in `scripts/smoke-test.js`. Refreshed `data/Induction_Modules_September_2026.xlsx` with the `M` rows removed at source. Three course codes whose only module was an `M` code no longer appear — see workaround 8. No renderer changed |
 | v2.1 | 2026-09-03 | **Course identity fixed — WD-1076.** A course is now identified by its **course code**, not by its name. Keying on the name split one course across several cards where the export spelled it inconsistently (`BA (Hons)` vs `BA (hons)`), and merged genuinely different courses that share a name (the full-time and part-time routes of one degree). Each course-year now keeps **all** its induction modules instead of only the last one read, and the pipeline stamps a guaranteed-unique `slug` that the renderers use instead of deriving one from the name at render time. Restores **25 courses** and **150 events** that were unreachable; eliminates all 12 colliding URLs |
@@ -203,7 +204,7 @@ Typography: **Open Sans** (body) and **Encode Sans Expanded** (headings/buttons)
 
 ---
 
-## Data-quality workarounds (v1.9, extended in v2.1, TECH-609 and TECH-610)
+## Data-quality workarounds (v1.9, extended in v2.1, TECH-609, TECH-610 and TECH-614)
 
 The 2026/27 timetable export (`data/ind_tt_20260902.xlsx`) arrived with several
 faults that are not present in the requirement and cannot be fixed upstream in
@@ -415,12 +416,54 @@ being quietly turned into a different room.
 **11 room numbers** were affected, across **169 event locations**: `0.10`,
 `0.20`, `0.30`, `1.10`, `1.30`, `2.10`, `2.20`, `2.30`, `3.10`, `3.20`, `3.30`.
 
+### 10. Mal-formed online joining links (TECH-614)
+
+The `Details` field has a length limit and the Teams or Zoom joining link is
+almost always the last thing in it, so the link is what gets clipped. Half a
+Teams address still looks like an address, and all three renderers were turning
+it into a clickable “Join online session” button — landing the student on a
+Teams error page at the moment their induction starts.
+
+Two separate faults were combining. The pipeline *was* already rejecting these
+links, but rejection meant leaving the URL as plain text in the description —
+and `linkifyDescription` then turned that text back into a link, undoing the
+check. Both halves are now fixed:
+
+* `is_meeting_url()` classifies a URL as a **live session** (Teams, Zoom,
+  Google Meet, Webex, GoToMeeting) rather than a page to read. Only these get
+  the treatment: a broken link to a reading list is a nuisance, a broken link
+  to the session itself means a student misses the session.
+* `meeting_url_problem()` applies **structural** checks — the Teams
+  `%40thread` conversation id; Teams `/meet/` id and passcode lengths; Zoom
+  9–12 digit meeting ids and `pwd` length; dangling percent-escapes; empty
+  trailing parameters. Deliberately structural rather than clever: a link is
+  only rejected when a part the platform itself requires is missing. Hiding a
+  link that would have worked costs a student just as much as showing one
+  that will not.
+* A failing link is **removed from the description text** and the event
+  flagged `online_link_issue`. All three renderers show **“Check with your
+  course leader for online link”** where the button would have been — as a
+  `<p>`, deliberately not styled as a link, because there is nothing to click.
+
+| | Count |
+|---|---|
+| Event rows affected | 87 |
+| Distinct sessions affected | 84 |
+| Distinct mal-formed links behind them | 5 |
+| Working links before and after the change | 140 → 140 |
+
+All five are `meetup-join` links cut off before `%40thread`. They are listed
+with their reasons by the build log, so they can be pasted into an email.
+**This is a display-side safety net, not a data fix** — the links still need
+correcting at source by CTU, and the notice will keep appearing until they are.
+
 ### Known faults left alone deliberately
 
 | Fault | Why | Action |
 |---|---|---|
-| Three Teams `meetup-join` URLs truncated mid-string by the export's field-length limit | A "Join the Teams meeting" button that 404s is worse for a student than visible raw text | Left as plain text so the School notices. Detected by the absence of `%40thread` |
-| One `https://student-system` with no TLD | Same — cannot resolve | Left as plain text |
+| Five Teams `meetup-join` URLs truncated mid-string by the export's field-length limit | A "Join the Teams meeting" button that 404s is worse for a student than no button at all | **Handled since v2.4** — see workaround 10. The link is removed and the session reads “Check with your course leader for online link”. **Raise with CTU** — still needs fixing at source |
+| One `https://student-system` with no TLD | Cannot resolve, and it is not an online session, so the notice would be wrong | Left as plain text. Since v2.4 the renderers no longer advertise it as “Join online session” |
+| ~27 sessions that describe themselves as online but carry no link at all (e.g. `Online level 5 induction`, `UPSU Talk online`) | Cannot be told apart reliably from descriptions that merely contain the word “teams” (`careers … teams`), so a heuristic would mislabel working sessions | **Raise with CTU / Jason** — a student here has the same problem and no link to detect |
 | Mojibake in at least one description (`KarenÂ¿s recent research`) | Character-encoding fault at source; guessing the intended character risks corrupting other rows | **Raise with the timetabling team** |
 | Descriptions truncated mid-word (`…get the most out of librar`) | Field-length limit at source | **Raise with the timetabling team** |
 | 33 pairs of courses share a name with no distinguishing wording, e.g. `MSc Civil Engineering` for both `P3388FTC` and `P3388PTC` | The code suffixes correlate with study mode but not cleanly enough to derive a "Full Time"/"Part Time" label safely — `PYC` and `FTC` both appear on full-time courses. Inventing a label risks labelling a timetable wrongly | Course code shown beside the name. **Raise with the timetabling team** — a proper mode field, or distinct names, would let us drop the codes |

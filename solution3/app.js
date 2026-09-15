@@ -268,12 +268,14 @@
               <th scope="col">Location</th><th scope="col">Ends</th>
             </tr></thead><tbody>`;
         for (const ev of grp.events.slice().sort(compareEventsByTime)) {
+          const linkState = { broken: false };
+          const descHtml = ev.description ? linkifyDesc(ev.description, linkState).trim() : '';
           ttHtml += `<tr>
             <td class="ev-time">${esc(ev.time)}</td>
             <td>
               <div class="ev-title">${esc(ev.title)}</div>
-              ${ev.description ? `<div class="ev-desc">${linkifyDesc(ev.description)}</div>` : ''}
-              ${buildLinksHtml(ev)}
+              ${descHtml ? `<div class="ev-desc">${descHtml}</div>` : ''}
+              ${buildLinksHtml(ev, linkState.broken)}
             </td>
             <td class="ev-loc">${locHtml(ev)}</td>
             <td class="ev-time">${esc(ev.finish)}</td>
@@ -473,8 +475,35 @@
     return /^https?:\/\//i.test(u) ? u : '';
   }
 
-  // Meeting / resource links lifted out of Details, each on its own line
-  function buildLinksHtml(ev) {
+  // ── Mal-formed live-session links (TECH-614) ──────────────────────────────
+  // The Details field has a length limit and the joining link is usually the
+  // last thing in it, so the link is what gets clipped. Half a Teams address
+  // still looks like an address, and the page used to render it as a join
+  // button that drops the student on an error page just as their induction
+  // starts. Where the builder spots that, the student is told who to ask.
+  const ONLINE_LINK_NOTICE = 'Check with your course leader for online link';
+
+  // Hosts whose links are a live session to join rather than a page to read.
+  // Kept in step with the same list in scripts/generate_data.py.
+  const MEETING_HOST_RE =
+    /(teams\.microsoft|teams\.live|zoom\.us|zoom\.com|meet\.google|webex|gotomeeting)/i;
+
+  function isMeetingUrl(url) {
+    return MEETING_HOST_RE.test(String(url).replace(/^https?:\/\//i, '').split('/')[0]);
+  }
+
+  function onlineLinkNoticeHtml() {
+    return `<p class="ev-link-notice">
+      <svg class="ev-link-notice-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 11.5v5"/><path d="M12 7.5v.5"/>
+      </svg>${esc(ONLINE_LINK_NOTICE)}</p>`;
+  }
+
+  // Meeting / resource links lifted out of Details, each on its own line.
+  // `inlineBroken` comes from linkifyDesc, for the case where an older
+  // data.js left a clipped link sitting in the description text.
+  function buildLinksHtml(ev, inlineBroken) {
     const links = Array.isArray(ev.links) ? ev.links : [];
     const html = links.map(l => {
       const url = safeUrl(l && l.url);
@@ -482,18 +511,36 @@
       return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="ev-join-link"
         >${esc(l.label || 'Open link')}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
     }).join('');
-    return html ? `<div class="ev-links">${html}</div>` : '';
+    // Where a session has a working link as well as a broken one, show both:
+    // the notice explains the gap without hiding what does work.
+    const notice = (ev.online_link_issue || inlineBroken) ? onlineLinkNoticeHtml() : '';
+    const inner = html + notice;
+    return inner ? `<div class="ev-links">${inner}</div>` : '';
   }
 
   // Fallback for older data.js files: any URL still inline in the description
   // becomes a hyperlink on its own line, delimiters stripped.
-  function linkifyDesc(text) {
+  //
+  // Two kinds are deliberately not linked. A Teams or Zoom address still
+  // inline is, by construction, one the builder refused — every usable one was
+  // lifted into `links[]` — so it is dropped and `state.broken` set, which
+  // brings up the notice. Anything without a real dotted hostname was cut
+  // short by the export and is left as plain text, since labelling
+  // `https://student-system` as an online session was wrong twice over.
+  function linkifyDesc(text, state) {
     const escaped = esc(text);
     return escaped.replace(/[\[\(&quot;&#39;]?\s*(https?:\/\/[^\s\[\]<>&]+)/gi, (m, rawUrl) => {
-      const url = safeUrl(rawUrl.replace(/[\]\),.;:!?]+$/, ''));
+      const trimmed = rawUrl.replace(/[\]\),.;:!?]+$/, '');
+      if (isMeetingUrl(trimmed)) {
+        if (state) state.broken = true;
+        return '';
+      }
+      const host = trimmed.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0];
+      if (!/^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(host)) return m;
+      const url = safeUrl(trimmed);
       if (!url) return m;
       return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="ev-join-link"
-        >Join online session<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+        >Open ${esc(host)}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
     });
   }
 

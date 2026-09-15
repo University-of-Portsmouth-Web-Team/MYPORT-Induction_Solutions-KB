@@ -54,6 +54,7 @@ window.UoPInductionWidget.initAll();
 - A–Z letter index sorted by course subject title (not award prefix)
 - Only courses with scheduled events are shown
 - Module ID and Course code footnote on each course detail view
+- Mal-formed Teams/Zoom joining links replaced with a “check with your course leader” notice (TECH-614)
 - WCAG 2.2 AA compliant
 
 ## Design system

@@ -239,6 +239,163 @@ for (const [dir, tableSel, scrollSel] of [['solution1', 'timetable-table', '.tim
     base !== -1 && reset > base, base === -1 ? 'base rule not found' : `base @${base}, reset @${reset}`);
 }
 
+
+/* ── TECH-614: mal-formed online joining links ──────────────────────────────
+   Two things have to hold in all three renderers. The pipeline must have taken
+   the clipped address out of the description, and the renderer must put the
+   notice where the join button would have been — without swallowing the links
+   that do work. The legacy case at the end is the one that actually exercises
+   the renderer's own guard: a deployed page can be running last week's data.js
+   against this week's renderer. */
+console.log('\n── TECH-614 mal-formed session links ──');
+
+const MEETING = /teams\.microsoft|teams\.live|zoom\.us|zoom\.com|meet\.google|webex|gotomeeting/i;
+
+let flaggedEvents = 0, linkedEvents = 0, inlineMeeting = 0, missingFlag = 0;
+for (const c of data) {
+  for (const yn of Object.keys(c.years)) {
+    for (const ev of c.years[yn].events || []) {
+      if (typeof ev.online_link_issue !== 'boolean') missingFlag++;
+      if (ev.online_link_issue) flaggedEvents++;
+      if ((ev.links || []).length) linkedEvents++;
+      if (MEETING.test(ev.description || '')) inlineMeeting++;
+    }
+  }
+}
+check('every event carries the online_link_issue flag', missingFlag === 0, missingFlag + ' without it');
+check('no meeting URL left sitting in a description', inlineMeeting === 0, inlineMeeting + ' found');
+check('some events flagged and some links still work',
+  flaggedEvents > 0 && linkedEvents > 0, flaggedEvents + ' flagged, ' + linkedEvents + ' linked');
+
+// Pick a course-year that will show the notice, and one with a working link.
+let flagged = null, working = null;
+for (const c of data) {
+  for (const yn of Object.keys(c.years)) {
+    const evs = c.years[yn].events || [];
+    if (!flagged && evs.some(e => e.online_link_issue)) flagged = { c, yn };
+    if (!working && evs.some(e => (e.links || []).length)) working = { c, yn };
+  }
+}
+
+/* Open a course-year the way a student does — by clicking its year button.
+   Deep links go through the same renderer, but hash routing under JSDOM does
+   not fire reliably, and a click is closer to what we are asserting about. */
+function openDetail(window, btnSel, contentId, courseId, year) {
+  const doc = window.document;
+  const btns = [...doc.querySelectorAll(btnSel)]
+    .filter(b => b.dataset.courseId === courseId);
+  const btn = btns.find(b => String(b.dataset.year) === String(year)) || btns[0];
+  if (!btn) return '';
+  btn.click();
+  const el = doc.getElementById(contentId);
+  return el ? el.innerHTML : '';
+}
+
+const RENDERERS = [
+  { label: 'solution1', win: () => w1, btn: '.year-link', content: 'timetable-content' },
+  { label: 'solution3', win: () => w3, btn: '.yr-btn',    content: 'detail-content'    }
+];
+
+for (const { label, win: getWin, btn, content } of RENDERERS) {
+  const win = getWin();
+  if (!win || !flagged) continue;
+  const html = openDetail(win, btn, content, flagged.c.id, flagged.yn);
+  check(label + ': notice rendered for a clipped link',
+    /Check with your course leader for online link/.test(html));
+  check(label + ': notice is a paragraph, not an anchor',
+    !/<a[^>]*(event|ev)-link-notice/.test(html));
+  check(label + ': no Teams or Zoom href survives',
+    !/href="[^"]*(teams\.microsoft|teams\.live|zoom\.us)/i.test(html));
+  check(label + ': no "Join online session" label survives',
+    !/Join online session/.test(html));
+
+  const wHtml = openDetail(win, btn, content, working.c.id, working.yn);
+  check(label + ': a usable link still opens in a new tab',
+    /target="_blank"/.test(wHtml) && /rel="noopener noreferrer"/.test(wHtml));
+  check(label + ': a usable link still warns about the new tab',
+    /opens in a new tab/.test(wHtml));
+}
+
+/* The renderer guard, against a legacy-shaped data.js: the clipped address is
+   still inline in the description and there is no online_link_issue flag.
+   Synthesised rather than shipped as a fixture so it cannot drift. */
+const LEGACY = [{
+  id: 'X9999FTC', slug: 'legacy-shaped-course', name: 'Legacy Shaped Course',
+  crs_code: 'X9999FTC', course_type: 'UG',
+  years: { 1: { year: 1, mod_code: 'I99999', mod_codes: ['I99999'], events: [{
+    event_id: 1, date: 'Wednesday 16 September 2026', date_sort: '2026-09-16',
+    day: 'Wed', time: '1:00pm', finish: '2:00pm', title: 'Drop-In Q&A Session',
+    description: 'Ask anything, https://teams.microsoft.com/l/meetup-join/19%3ameeting_ZTVhZDEzNDktOTJkNC00MGQ4LWE2NWEtNzIxZjAzMGEyZ',
+    locations: [], links: [], site: '', room: '', is_online: true, mod_code: 'I99999'
+  }] } }
+}];
+
+function bootLegacy(dir, entry, extras = []) {
+  const html = fs.readFileSync(path.join(ROOT, dir, 'index.html'), 'utf8');
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.org/' });
+  const { window } = dom;
+  window.matchMedia = window.matchMedia || (() => ({ matches: false, addListener(){}, removeListener(){}, addEventListener(){}, removeEventListener(){} }));
+  for (const f of extras) {
+    const p = path.join(ROOT, dir, f);
+    if (fs.existsSync(p)) window.eval(fs.readFileSync(p, 'utf8'));
+  }
+  window.eval('window.__COURSES_DATA__ = ' + JSON.stringify(LEGACY) + ';');
+  window.eval(fs.readFileSync(path.join(ROOT, dir, entry), 'utf8'));
+  window.document.dispatchEvent(new window.Event('DOMContentLoaded', { bubbles: true }));
+  return window;
+}
+
+for (const [label, dir, entry, extras, btnSel, contentId] of [
+  ['solution1', 'solution1', 'app.js', ['analytics.js', 'external-links.js'], '.year-link', 'timetable-content'],
+  ['solution3', 'solution3', 'app.js', ['external-links.js'], '.yr-btn', 'detail-content']
+]) {
+  let lw;
+  try { lw = bootLegacy(dir, entry, extras); }
+  catch (e) { check(label + ': legacy data.js boots', false, e.message); continue; }
+  const html = openDetail(lw, btnSel, contentId, 'X9999FTC', 1);
+  check(label + ': legacy data.js — clipped inline link is not linkified',
+    !/href="[^"]*teams\.microsoft/i.test(html));
+  check(label + ': legacy data.js — notice shown instead',
+    /Check with your course leader for online link/.test(html));
+  check(label + ': legacy data.js — raw address not left visible',
+    !/meetup-join/.test(html));
+}
+
+/* The widget keeps its own copy of the logic and renders into the host page
+   rather than a named container, so it gets its own pass. */
+{
+  const wsrc = fs.readFileSync(path.join(ROOT, 'solution2/induction-widget.js'), 'utf8');
+  check('solution2: widget no longer labels anything "Join online session"',
+    !wsrc.includes('>Join online session'));
+  check('solution2: notice is styled', wsrc.includes('.uop-ind__link-notice'));
+
+  let ww;
+  try { ww = boot('solution2', 'induction-widget.js', [], 'demo-search-page.html'); }
+  catch (e) { check('solution2: boots for the notice test', false, e.message); ww = null; }
+
+  if (ww && flagged) {
+    const doc = ww.document;
+    const btn = [...doc.querySelectorAll('.uop-ind__year-btn')]
+      .find(b => b.dataset.courseId === flagged.c.id);
+    if (!btn) {
+      check('solution2: year button for the flagged course exists', false);
+    } else {
+      btn.click();
+      const html = doc.body.innerHTML;
+      check('solution2: notice rendered for a clipped link',
+        /Check with your course leader for online link/.test(html));
+      check('solution2: no Teams or Zoom href survives',
+        !/href="[^"]*(teams\.microsoft|teams\.live|zoom\.us)/i.test(html));
+      const n = doc.querySelector('.uop-ind__link-notice');
+      check('solution2: notice is a paragraph, not an anchor', n && n.tagName === 'P',
+        n ? n.tagName : 'not found');
+      check('solution2: notice icon is hidden from assistive technology',
+        n && n.querySelector('svg') &&
+        n.querySelector('svg').getAttribute('aria-hidden') === 'true');
+    }
+  }
+}
+
 console.log(`\n${failures === 0 ? 'All checks passed.' : failures + ' CHECK(S) FAILED.'}`);
 
 process.exit(failures ? 1 : 0);

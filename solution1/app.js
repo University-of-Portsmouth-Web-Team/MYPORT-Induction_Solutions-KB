@@ -462,12 +462,16 @@
           <tbody>`;
       for (const ev of group.events.slice().sort(compareEventsByTime)) {
         const locationHtml = buildLocationHtml(ev);
+        // linkifyDescription reports back through `linkState` when it had to
+        // drop a clipped joining link, so the notice can be shown (TECH-614).
+        const linkState = { broken: false };
+        const descHtml = ev.description ? linkifyDescription(ev.description, linkState).trim() : '';
         html += `<tr>
           <td class="event-time">${escHtml(ev.time)}</td>
           <td>
             <div class="event-title">${escHtml(ev.title)}</div>
-            ${ev.description ? `<div class="event-description">${linkifyDescription(ev.description)}</div>` : ''}
-            ${buildLinksHtml(ev)}
+            ${descHtml ? `<div class="event-description">${descHtml}</div>` : ''}
+            ${buildLinksHtml(ev, linkState.broken)}
           </td>
           <td class="event-location">${locationHtml}</td>
           <td class="event-time">${escHtml(ev.finish)}</td>
@@ -635,8 +639,36 @@
     return /^https?:\/\//i.test(u) ? u : '';
   }
 
-  // Meeting / resource links lifted out of the Details field, each on its own line
-  function buildLinksHtml(ev) {
+  // ── Mal-formed live-session links (TECH-614) ────────────────
+  // The Details field has a length limit and the joining link is usually the
+  // last thing in it, so the link is what gets clipped. Half a Teams address
+  // still looks like an address, and the page used to render it as a "Join
+  // the Teams meeting" button that drops the student on an error page just as
+  // their induction starts. Where the builder spots that, the student is told
+  // who to ask instead. The links themselves still need fixing at source.
+  const ONLINE_LINK_NOTICE = 'Check with your course leader for online link';
+
+  // Hosts whose links are a live session to join rather than a page to read.
+  // Kept in step with the same list in generate_data.py / build-data.js.
+  const MEETING_HOST_RE =
+    /(teams\.microsoft|teams\.live|zoom\.us|zoom\.com|meet\.google|webex|gotomeeting)/i;
+
+  function isMeetingUrl(url) {
+    return MEETING_HOST_RE.test(String(url).replace(/^https?:\/\//i, '').split('/')[0]);
+  }
+
+  function onlineLinkNoticeHtml() {
+    return `<p class="event-link-notice">
+      <svg class="event-link-notice-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"
+        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9"/><path d="M12 11.5v5"/><path d="M12 7.5v.5"/>
+      </svg>${escHtml(ONLINE_LINK_NOTICE)}</p>`;
+  }
+
+  // Meeting / resource links lifted out of the Details field, each on its own
+  // line. `inlineBroken` comes from linkifyDescription, for the case where an
+  // older data.js left a clipped link sitting in the description text.
+  function buildLinksHtml(ev, inlineBroken) {
     const links = Array.isArray(ev.links) ? ev.links : [];
     const html = links.map(l => {
       const url = safeUrl(l && l.url);
@@ -645,20 +677,38 @@
       return `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="event-join-link"
         >${escHtml(label)}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
     }).join('');
-    return html ? `<div class="event-links">${html}</div>` : '';
+    // Where a session has a working link as well as a broken one, show both:
+    // the notice explains the gap without hiding what does work.
+    const notice = (ev.online_link_issue || inlineBroken) ? onlineLinkNoticeHtml() : '';
+    const inner = html + notice;
+    return inner ? `<div class="event-links">${inner}</div>` : '';
   }
 
   // Fallback for older data.js files: turn any URL still sitting inline in the
   // description into a hyperlink on its own line, delimiters stripped.
-  function linkifyDescription(text) {
+  //
+  // Two kinds of URL are deliberately not linked. A Teams or Zoom address
+  // still inline is, by construction, one the builder refused — every usable
+  // one was lifted into `links[]` — so it is dropped and `state.broken` set,
+  // which brings up the notice. Anything without a real dotted hostname was
+  // cut short by the export and is left as plain text, since labelling
+  // `https://student-system` as an online session was wrong twice over.
+  function linkifyDescription(text, state) {
     const escaped = escHtml(text);
     return escaped.replace(
       /[\[\(&quot;&#39;]?\s*(https?:\/\/[^\s\[\]<>&]+)/gi,
       (m, rawUrl) => {
-        const url = safeUrl(rawUrl.replace(/[\]\),.;:!?]+$/, ''));
+        const trimmed = rawUrl.replace(/[\]\),.;:!?]+$/, '');
+        if (isMeetingUrl(trimmed)) {
+          if (state) state.broken = true;
+          return '';
+        }
+        const host = trimmed.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0];
+        if (!/^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(host)) return m;
+        const url = safeUrl(trimmed);
         if (!url) return m;
         return `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="event-join-link"
-          >Join online session<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+          >Open ${escHtml(host)}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
       }
     );
   }

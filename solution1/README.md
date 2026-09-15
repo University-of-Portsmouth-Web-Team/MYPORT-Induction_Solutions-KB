@@ -29,6 +29,7 @@ Open `index.html` in a browser, or deploy to any static host (GitHub Pages, Netl
 - Contextual welcome text (UG Year 1 / UG returning / PGT)
 - Timetable ordered by date → time
 - Online event badge
+- Mal-formed Teams/Zoom joining links replaced with a “check with your course leader” notice (TECH-614)
 - Module ID and Course code footnote on each course detail page
 - Queries, International Students, and Further Information sections
 - Hash-based routing for deep linking and browser back/forward

@@ -260,6 +260,11 @@ function contrastPairs(t) {
   add('Link text on page background', '--color-link', '--color-bg', 4.5);
   add('Link text on card surface', '--color-link', '--color-surface', 4.5);
   add('Link hover on card surface', '--color-link-hover', '--color-surface', 4.5);
+  // TECH-614 — the "check with your course leader" notice. It replaces a link
+  // but is not one, so it has no underline or hover state to lean on; the
+  // colour is doing all of the work and has to clear AA on its own.
+  add('Mal-formed link notice on card surface', '--color-navy-dark', '--color-surface', 4.5);
+  add('Mal-formed link notice on page background', '--color-navy-dark', '--color-bg', 4.5);
   add('Error text on surface', '--color-error', '--color-surface', 4.5);
   add('White on navy header', '--color-white', '--color-navy', 4.5);
   add('White on dark navy button', '--color-white', '--color-navy-dark', 4.5);
@@ -369,6 +374,9 @@ function auditResponsiveCss() {
     cssCheck(s1, 'scroll region has a visible focus indicator',
       selectorExists(s1, '.timetable-scroll:focus-visible'));
     cssCheck(s1, 'external-link marker is styled', selectorExists(s1, '.external-link-marker'));
+    // TECH-614 — the notice must exist and must not be dressed as a link.
+    cssCheck(s1, 'mal-formed session link notice is styled',
+      selectorExists(s1, '.event-link-notice'));
   }
 
   const s3 = PROJECT.css.find(f => /solution3/.test(f));
@@ -381,6 +389,9 @@ function auditResponsiveCss() {
     cssCheck(s3, 'no timetable column is hidden with display:none on narrow screens',
       hidden.length === 0, hidden.join('; '));
     cssCheck(s3, 'timetable has a horizontal scroll region', selectorExists(s3, '.tt-scroll'));
+    // TECH-614 — same notice, solution 3's class names.
+    cssCheck(s3, 'mal-formed session link notice is styled',
+      selectorExists(s3, '.ev-link-notice'));
   }
 }
 

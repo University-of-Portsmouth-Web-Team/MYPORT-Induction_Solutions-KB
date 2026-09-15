@@ -598,3 +598,22 @@ h3 { font-size: 1.0625rem; }
   overflow-wrap: anywhere;
 }
 .ev-join-link:hover { color: var(--link-h); }
+
+/* TECH-614 — shown where the join button would have been, when the export
+   clipped the Teams or Zoom address short. Deliberately not a link and not
+   styled like one: there is nothing here to click, and a disabled-looking
+   button would only invite the student to keep trying it. */
+.ev-link-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--navy-d);
+}
+.ev-link-notice-icon {
+  flex: none;
+  margin-top: 3px;
+}

@@ -282,6 +282,25 @@ These cannot be automated and are **not** covered by the result above:
 
 ## Regression cover
 
+`scripts/smoke-test.js` also covers TECH-614 across all three solutions:
+
+- the “check with your course leader” notice is a `<p>` and contains no
+  anchor — it stands where a link used to, and must not read as one to a
+  screen reader or a keyboard user
+- its icon is `aria-hidden`, so the notice is announced once, not twice
+- no Teams or Zoom `href` and no “Join online session” label survives on a
+  page whose links were clipped
+- a *usable* link still opens in a new tab, still carries
+  `rel="noopener noreferrer"` and still warns that it does so — the fix must
+  not have quietly swallowed the working case
+- a synthesised **legacy-shaped `data.js`** (clipped address still inline, no
+  `online_link_issue` flag) exercises the renderer's own guard, since a
+  deployed page can be running last week's data against this week's renderer
+
+Mutation-tested: suppressing the notice fails 7 assertions and removing the
+renderer guard fails 6, so both halves of the fix are load-bearing.
+
+
 The audit is not the only guard. `scripts/smoke-test.js` asserts, on every
 run:
 

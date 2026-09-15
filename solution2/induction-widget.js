@@ -275,6 +275,15 @@
       overflow-wrap: anywhere;
     }
     .uop-ind__join-link:hover { color: var(--ui-link-h); }
+    /* TECH-614 — shown where the join button would have been, when the export
+       clipped the address short. Deliberately not a link and not styled like
+       one: there is nothing here to click. */
+    .uop-ind__link-notice {
+      display: flex; align-items: flex-start; gap: 6px; margin: 4px 0 0;
+      font-size: 0.875rem; font-weight: 600; line-height: 1.5;
+      color: var(--ui-navy-d);
+    }
+    .uop-ind__link-notice-icon { flex: none; margin-top: 3px; }
     .uop-ind__no-events { text-align: center; padding: 32px 16px; color: var(--ui-txtm); font-size: 0.9375rem; }
     .uop-ind__info-block {
       border: 1px solid var(--ui-bdr); border-radius: 0;
@@ -726,12 +735,16 @@
                 <th scope="col">Time</th><th scope="col">Session</th><th scope="col">Location</th><th scope="col">Ends</th>
               </tr></thead><tbody>`;
           for (const ev of grp.events.slice().sort((a, b) => this.compareEventsByTime(a, b))) {
+            // linkifyDescription reports back through `linkState` when it had
+            // to drop a clipped joining link, so the notice shows (TECH-614).
+            const linkState = { broken: false };
+            const descHtml = ev.description ? this.linkifyDescription(ev.description, linkState).trim() : '';
             ttHtml += `<tr>
               <td class="uop-ind__ev-time">${this.escHtml(ev.time)}</td>
               <td>
                 <div class="uop-ind__ev-title">${this.escHtml(ev.title)}</div>
-                ${ev.description ? `<div class="uop-ind__ev-desc">${this.linkifyDescription(ev.description)}</div>` : ''}
-                ${this.buildLinksHtml(ev)}
+                ${descHtml ? `<div class="uop-ind__ev-desc">${descHtml}</div>` : ''}
+                ${this.buildLinksHtml(ev, linkState.broken)}
               </td>
               <td class="uop-ind__ev-loc">${this.buildLoc(ev)}</td>
               <td class="uop-ind__ev-time">${this.escHtml(ev.finish)}</td>
@@ -853,8 +866,29 @@
       return /^https?:\/\//i.test(u) ? u : '';
     }
 
-    // Meeting / resource links lifted out of Details, each on its own line
-    buildLinksHtml(ev) {
+    /* ── Mal-formed live-session links (TECH-614) ──────────────────────────
+       The Details field has a length limit and the joining link is usually the
+       last thing in it, so the link is what gets clipped. Half a Teams address
+       still looks like an address, and the widget used to render it as a join
+       button that drops the student on an error page just as their induction
+       starts. Where the builder spots that, the student is told who to ask. */
+    isMeetingUrl(url) {
+      const host = String(url).replace(/^https?:\/\//i, '').split('/')[0];
+      return /(teams\.microsoft|teams\.live|zoom\.us|zoom\.com|meet\.google|webex|gotomeeting)/i.test(host);
+    }
+
+    onlineLinkNoticeHtml() {
+      return `<p class="uop-ind__link-notice">
+        <svg class="uop-ind__link-notice-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 11.5v5"/><path d="M12 7.5v.5"/>
+        </svg>${this.escHtml('Check with your course leader for online link')}</p>`;
+    }
+
+    // Meeting / resource links lifted out of Details, each on its own line.
+    // `inlineBroken` comes from linkifyDescription, for the case where an
+    // older data.js left a clipped link sitting in the description text.
+    buildLinksHtml(ev, inlineBroken) {
       const links = Array.isArray(ev.links) ? ev.links : [];
       const html = links.map(l => {
         const url = this.safeUrl(l && l.url);
@@ -862,7 +896,11 @@
         return `<a href="${this.escHtml(url)}" target="_blank" rel="noopener noreferrer" class="uop-ind__join-link"
           >${this.escHtml(l.label || 'Open link')}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
       }).join('');
-      return html ? `<div class="uop-ind__ev-links">${html}</div>` : '';
+      // Where a session has a working link as well as a broken one, show both:
+      // the notice explains the gap without hiding what does work.
+      const notice = (ev.online_link_issue || inlineBroken) ? this.onlineLinkNoticeHtml() : '';
+      const inner = html + notice;
+      return inner ? `<div class="uop-ind__ev-links">${inner}</div>` : '';
     }
 
     getWelcomeTexts(type, year) {
@@ -886,13 +924,27 @@
 
     // Fallback for older data.js files: any URL still inline in the description
     // becomes a hyperlink on its own line, delimiters stripped.
-    linkifyDescription(text) {
+    /* Fallback for older data.js files. Two kinds of URL are deliberately not
+       linked. A Teams or Zoom address still inline is, by construction, one the
+       builder refused — every usable one was lifted into `links[]` — so it is
+       dropped and `state.broken` set, which brings up the notice. Anything
+       without a real dotted hostname was cut short by the export and is left as
+       plain text, since labelling `https://student-system` as an online session
+       was wrong twice over. (TECH-614) */
+    linkifyDescription(text, state) {
       const escaped = this.escHtml(text);
       return escaped.replace(/[\[\(&quot;&#39;]?\s*(https?:\/\/[^\s\[\]<>&]+)/gi, (m, rawUrl) => {
-        const url = this.safeUrl(rawUrl.replace(/[\]\),.;:!?]+$/, ''));
+        const trimmed = rawUrl.replace(/[\]\),.;:!?]+$/, '');
+        if (this.isMeetingUrl(trimmed)) {
+          if (state) state.broken = true;
+          return '';
+        }
+        const host = trimmed.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0];
+        if (!/^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(host)) return m;
+        const url = this.safeUrl(trimmed);
         if (!url) return m;
         return `<a href="${this.escHtml(url)}" target="_blank" rel="noopener noreferrer" class="uop-ind__join-link"
-          >Join online session<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
+          >Open ${this.escHtml(host)}<span aria-hidden="true"> \u2197</span><span class="sr-only"> (opens in a new tab)</span></a>`;
       });
     }
 

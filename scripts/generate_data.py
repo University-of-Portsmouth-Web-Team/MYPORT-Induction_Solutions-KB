@@ -87,6 +87,18 @@ Output:
    cells are now rendered to the export's own two-decimal convention.  Note
    that `dtype={"Site": str}` on the read does not fix this — the cell is
    already a float before pandas casts it.
+
+10. Mal-formed live-session links  (TECH-614)
+   The Details field has a length limit and the joining link is nearly always
+   the last thing in it, so the link is what gets clipped.  Half a Teams
+   address still looks like an address, and both the pipeline and the
+   renderer used to turn it into a "Join the Teams meeting" button that lands
+   the student on an error page minutes before their induction starts.  A
+   Teams or Zoom link that fails a structural check is now removed from the
+   text altogether and the event is flagged `online_link_issue`, so the
+   renderer can tell the student to check with their course leader instead.
+   Note this is a display-side safety net, not a data fix — the links still
+   need correcting at source by CTU.
 """
 
 import argparse
@@ -239,11 +251,93 @@ def is_usable_url(url: str) -> bool:
     # Needs a real dotted hostname with a plausible TLD
     if not re.match(r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", host):
         return False
-    # Teams "meetup-join" deep links carry a thread id; without it the link
-    # has been cut off by the export's field-length limit.
-    if "/l/meetup-join/" in url.lower() and "%40thread" not in url.lower():
+    # A joining link for a live session gets the stricter structural check.
+    if is_meeting_url(url) and meeting_url_problem(url):
         return False
     return True
+
+
+# ── TECH-614: mal-formed online session links ────────────────────────────────
+#
+# Hosts whose links are a live session to join, rather than a page to read.
+# A broken link to a reading list is a nuisance; a broken link to the session
+# itself means a student misses the session, so only these get the notice.
+_MEETING_HOSTS = (
+    "teams.microsoft", "teams.live", "zoom.us", "zoom.com",
+    "meet.google", "webex", "gotomeeting",
+)
+
+
+def url_host(url: str) -> str:
+    """Bare lower-case hostname, with any scheme, port, path and `www.` removed."""
+    host = re.sub(r"^https?://", "", url, flags=re.IGNORECASE).split("/")[0].lower()
+    host = host.split(":")[0]
+    return host[4:] if host.startswith("www.") else host
+
+
+def is_meeting_url(url: str) -> bool:
+    """True when *url* is a joining link for a live online session."""
+    host = url_host(url)
+    return any(h in host for h in _MEETING_HOSTS)
+
+
+def meeting_url_problem(url: str) -> str:
+    """Say why a joining link cannot work, or return "" if it looks complete.
+
+    The checks are deliberately structural: a link is only rejected when a
+    part the platform itself requires is absent or has plainly been cut short.
+    Anything merely unfamiliar is passed through, because hiding a link that
+    would have worked costs a student just as much as showing one that will
+    not.  The reason string is for the build log, not for students.
+    """
+    host  = url_host(url)
+    rest  = re.sub(r"^https?://[^/?#]+", "", url, flags=re.IGNORECASE)
+    path  = rest.split("?")[0].split("#")[0]
+    query = rest.partition("?")[2].split("#")[0]
+
+    def param(name: str) -> str | None:
+        m = re.search(rf"(?:^|&){re.escape(name)}=([^&]*)", query)
+        return m.group(1) if m else None
+
+    # Signs that the string simply stops part-way through.
+    if re.search(r"%[0-9A-Fa-f]?$", url):
+        return "ends part-way through an encoded character"
+    if re.search(r"[?&=]$", url):
+        return "ends on an empty query parameter"
+    if path in ("", "/"):
+        return "has no meeting path after the host name"
+
+    if "teams.microsoft" in host or "teams.live" in host:
+        # /l/meetup-join/19%3ameeting_<id>%40thread.v2/0?context=…
+        # The conversation id is what the field-length limit usually clips.
+        if "/l/meetup-join/" in path.lower():
+            if "%40thread" not in path.lower():
+                return "Teams meetup-join link has lost its %40thread conversation id"
+            return ""
+        # /meet/<numeric id>?p=<passcode>
+        m = re.match(r"^/meet/(\d+)/?$", path)
+        if m:
+            if len(m.group(1)) < 9:
+                return "Teams meeting id is too short to be a complete one"
+            passcode = param("p")
+            if passcode is not None and len(passcode) < 12:
+                return "Teams passcode is shorter than a complete one"
+            return ""
+        return ""   # some other Teams URL shape — not ours to judge
+
+    if "zoom.us" in host or host.endswith("zoom.com"):
+        # /j/<id>, /s/<id>, /w/<id>, /wc/join/<id>  (+ optional ?pwd=)
+        m = re.match(r"^/(?:j|s|w|wc/join)/(\d+)/?$", path)
+        if m:
+            if not 9 <= len(m.group(1)) <= 12:
+                return "Zoom meeting id is not a complete 9–12 digit id"
+            pwd = param("pwd")
+            if pwd is not None and len(pwd) < 6:
+                return "Zoom passcode is shorter than a complete one"
+            return ""
+        return ""
+
+    return ""
 
 
 def _tidy_fragment(text: str) -> str:
@@ -263,16 +357,34 @@ def _tidy_fragment(text: str) -> str:
     return t
 
 
-def extract_links(details: str) -> tuple[str, list[str]]:
-    """Split *details* into (text without URLs, ordered list of unique URLs)."""
+def extract_links(details: str) -> tuple[str, list[str], list[str]]:
+    """Split *details* into text, usable URLs, and reasons a session link failed.
+
+    The third value is empty for almost every row.  Where it is not, the
+    export has clipped a Teams or Zoom joining link: that link is taken out of
+    the text rather than left in it, because a half-written address is no more
+    use to a student than none and reads as though the page is broken.  The
+    renderer shows the "check with your course leader" notice in its place.
+    (TECH-614)
+    """
     if not details:
-        return "", []
+        return "", [], []
 
     found: list[str] = []
+    broken: list[str] = []
 
     def _swap(match: "re.Match[str]") -> str:
         url = _clean_url(match.group(0))
-        if not url or not is_usable_url(url):   # truncated / unusable — leave it be
+        if not url:
+            return match.group(0)
+        if is_meeting_url(url):
+            problem = meeting_url_problem(url) or (
+                "" if is_usable_url(url) else "is not a well-formed web address"
+            )
+            if problem:
+                broken.append(f"{url}  ({problem})")
+                return _SENTINEL
+        elif not is_usable_url(url):    # truncated / unusable — leave it be
             return match.group(0)
         found.append(url)
         return _SENTINEL
@@ -284,7 +396,7 @@ def extract_links(details: str) -> tuple[str, list[str]]:
 
     # De-duplicate while preserving order (some rows list the same link twice)
     urls = list(dict.fromkeys(found))
-    return text, urls
+    return text, urls, list(dict.fromkeys(broken))
 
 
 def link_label(url: str) -> str:
@@ -607,6 +719,8 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
     events_by_mod: dict[str, list] = {}
     multi_room_events = 0
     linked_events     = 0
+    broken_link_events = 0
+    broken_link_reasons: dict[str, int] = {}
 
     for _, ev in df_events.iterrows():
         mod_code = str(ev["Module"]).strip()
@@ -618,9 +732,13 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
         # ── Workaround 4: lift URLs out of Details before the title split ─────
         # Doing this first also rescues rows where the URL sits in front of the
         # session name and would otherwise have been read as the title.
-        details, urls = extract_links(raw_details)
+        details, urls, broken_links = extract_links(raw_details)
         if urls:
             linked_events += 1
+        if broken_links:
+            broken_link_events += 1
+            for reason in broken_links:
+                broken_link_reasons[reason] = broken_link_reasons.get(reason, 0) + 1
 
         comma_pos = details.find(",")
         if comma_pos > 0:
@@ -659,6 +777,8 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
             "description": description,
             "locations":  locations,
             "links":      [{"url": u, "label": link_label(u)} for u in urls],
+            # TECH-614 — a Teams/Zoom joining link was present but unusable.
+            "online_link_issue": bool(broken_links),
             "site":       ", ".join(legacy_buildings),
             "room":       ", ".join(legacy_rooms),
             "is_online":  is_online,
@@ -768,6 +888,11 @@ def build_courses(modules_path: str, events_path: str) -> list[dict]:
     print(f"  Total events:          {total_events}")
     print(f"  Multi-room events:     {multi_room_events}  (room/building pairs listed one per line)")
     print(f"  Events with a link:    {linked_events}  (URL lifted out of Details)")
+    print(f"  Mal-formed live links: {broken_link_events}  (TECH-614 — notice shown in place of the button)")
+    if broken_link_reasons:
+        print("\n  Session links that could not be used — worth sending to CTU:")
+        for reason, count in sorted(broken_link_reasons.items(), key=lambda kv: -kv[1]):
+            print(f"    ×{count:<4} {reason}")
 
     return courses_list
 
